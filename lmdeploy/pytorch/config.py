@@ -451,7 +451,6 @@ class MiscConfig:
     logprobs_mode: str = None
     dllm_config: DLLMConfig = None
     enable_return_routed_experts: bool = False
-    moe_trace_output: str = None
 
     @classmethod
     def from_engine_config(cls, engine_config: PytorchEngineConfig):
@@ -475,7 +474,6 @@ class MiscConfig:
             logprobs_mode=engine_config.logprobs_mode,
             dllm_config=dllm_config,
             enable_return_routed_experts=engine_config.enable_return_routed_experts,
-            moe_trace_output=engine_config.moe_trace_output,
         )
         return misc_config
 

@@ -9,17 +9,15 @@ import torch.nn.functional as F
 from torch import nn
 from transformers.configuration_utils import PretrainedConfig
 
-from lmdeploy.pytorch.distributed import get_world_rank
-from lmdeploy.pytorch.kernels.cuda.focus import (focus_compact_states, focus_compute_targets,
-                                                 focus_importance_ragged, focus_select_and_enforce_ragged)
 from lmdeploy.pytorch.model_inputs import StepContext, StepContextManager, get_step_ctx_manager
 from lmdeploy.pytorch.nn import ApplyRotaryEmb, Attention, RMSNorm, SiluAndMul, build_rotary_embedding_from_config
 from lmdeploy.pytorch.nn.linear import (build_down_linear, build_gateup_linear, build_o_proj, build_qkv_proj,
                                         build_rowwise_linear)
 from lmdeploy.pytorch.nn.moe import build_fused_moe
 from lmdeploy.pytorch.weight_loader.model_weight_loader import load_weight
+from lmdeploy.pytorch.kernels.cuda.focus import (focus_compact_states, focus_compute_targets,
+                                                 focus_importance_ragged, focus_select_and_enforce_ragged)
 
-from .moe_trace import MoERouteTrace
 from .utils.cudagraph import CudaGraphMeta, CudaGraphMixin
 
 
@@ -527,15 +525,12 @@ class LLaDA2MoeSparseMoeBlock(nn.Module):
     def __init__(self,
                  config: PretrainedConfig,
                  layer_idx: int,
-                 route_trace: Optional[MoERouteTrace] = None,
                  dtype: torch.dtype = None,
                  device: torch.device = None):
         super().__init__()
         self.config = config
         quantization_config = getattr(config, 'quantization_config', None)
         self.hidden_dim = config.hidden_size
-        self.layer_idx = layer_idx
-        self.route_trace = route_trace
         self.ffn_dim = config.moe_intermediate_size or config.intermediate_size
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
@@ -565,9 +560,6 @@ class LLaDA2MoeSparseMoeBlock(nn.Module):
         hidden_states = hidden_states.view(-1, hidden_dim)
         topk_weights, topk_ids = self.gate(hidden_states)
 
-        if self.route_trace is not None:
-            self.route_trace.record(self.layer_idx, topk_ids)
-
         out_states = self.experts(hidden_states, topk_weights, topk_ids)
 
         if self.shared_experts is not None:
@@ -585,7 +577,6 @@ class LLaDA2MoeDecoderLayer(nn.Module):
                  layer_idx: int,
                  focus_enabled: bool = False,
                  focus_max_batch_size: Optional[int] = 0,
-                 route_trace: Optional[MoERouteTrace] = None,
                  dtype: torch.dtype = None,
                  device: torch.device = None):
         super().__init__()
@@ -596,11 +587,7 @@ class LLaDA2MoeDecoderLayer(nn.Module):
 
         use_moe = (getattr(config, 'num_experts', 0) > 0 and layer_idx >= getattr(config, 'first_k_dense_replace', 0))
         if use_moe:
-            self.mlp = LLaDA2MoeSparseMoeBlock(config,
-                                               layer_idx=layer_idx,
-                                               route_trace=route_trace,
-                                               dtype=dtype,
-                                               device=device)
+            self.mlp = LLaDA2MoeSparseMoeBlock(config, layer_idx=layer_idx, dtype=dtype, device=device)
         else:
             self.mlp = LLaDA2MoeMLP(config, intermediate_size=config.intermediate_size, dtype=dtype, device=device)
 
@@ -696,13 +683,11 @@ class LLaDA2MoeModel(nn.Module):
                  config: PretrainedConfig,
                  focus_enabled: bool = False,
                  focus_max_batch_size: Optional[int] = 0,
-                 route_trace: Optional[MoERouteTrace] = None,
                  dtype: torch.dtype = None,
                  device: torch.device = None):
         super().__init__()
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
-        self.route_trace = route_trace
 
         self.word_embeddings = nn.Embedding(config.vocab_size,
                                             config.hidden_size,
@@ -715,7 +700,6 @@ class LLaDA2MoeModel(nn.Module):
                                   layer_idx,
                                   focus_enabled=focus_enabled,
                                   focus_max_batch_size=focus_max_batch_size,
-                                  route_trace=route_trace,
                                   dtype=dtype,
                                   device=device)
             for layer_idx in range(config.num_hidden_layers)
@@ -745,33 +729,20 @@ class LLaDA2MoeModel(nn.Module):
         if context is not None:
             context.rotary_pos_emb = rotary_pos_emb
 
-        trace_started = False
-        if self.route_trace is not None:
-            query_tokens = hidden_states.numel() // hidden_states.shape[-1]
-            trace_started = self.route_trace.begin_forward(context, query_tokens)
-
         residual = None
-        try:
-            for idx, decoder_layer in enumerate(self.layers):
-                past_key_value = past_key_values[idx]
-                if context is not None:
-                    rotary_override = getattr(context, 'rotary_pos_emb', None)
-                    if rotary_override is not None:
-                        rotary_pos_emb = rotary_override
-                hidden_states, residual = decoder_layer(
-                    hidden_states,
-                    rotary_pos_emb=rotary_pos_emb,
-                    past_key_value=past_key_value,
-                    residual=residual,
-                    attn_metadata=attn_metadata,
-                )
-        except Exception:
-            if trace_started:
-                self.route_trace.abort_forward()
-            raise
-
-        if trace_started:
-            self.route_trace.finish_forward()
+        for idx, decoder_layer in enumerate(self.layers):
+            past_key_value = past_key_values[idx]
+            if context is not None:
+                rotary_override = getattr(context, 'rotary_pos_emb', None)
+                if rotary_override is not None:
+                    rotary_pos_emb = rotary_override
+            hidden_states, residual = decoder_layer(
+                hidden_states,
+                rotary_pos_emb=rotary_pos_emb,
+                past_key_value=past_key_value,
+                residual=residual,
+                attn_metadata=attn_metadata,
+            )
 
         hidden_states, _ = self.norm(hidden_states, residual)
         return hidden_states
@@ -850,22 +821,9 @@ class LLaDA2MoeModelLM(nn.Module, CudaGraphMixin):
             config.dllm_block_length = 1
         focus_enabled = bool(dllm_cfg is not None and getattr(dllm_cfg, 'enable_focus', False))
         focus_max_batch_size = getattr(ctx_mgr.build_ctx, 'max_batch_size', None)
-        trace_path = getattr(ctx_mgr.build_ctx, 'moe_trace_output', None)
-        if trace_path is not None and focus_enabled:
-            raise ValueError('LLaDA2 MoE route tracing currently supports FOCUS-disabled runs only')
-        route_trace = None
-        if trace_path is not None:
-            _, rank = get_world_rank()
-            if rank == 0:
-                route_trace = MoERouteTrace(trace_path,
-                                            num_experts=getattr(config, 'num_experts', 0),
-                                            top_k=getattr(config, 'num_experts_per_tok', 0),
-                                            num_hidden_layers=config.num_hidden_layers,
-                                            max_batch_size=focus_max_batch_size)
         self.model = LLaDA2MoeModel(config,
                                     focus_enabled=focus_enabled,
                                     focus_max_batch_size=focus_max_batch_size,
-                                    route_trace=route_trace,
                                     dtype=dtype,
                                     device=device)
         self.lm_head = build_rowwise_linear(config.hidden_size,

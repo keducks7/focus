@@ -255,25 +255,3 @@ def test_parse_args_rejects_non_test_split_for_gsm8k(monkeypatch):
 
     with pytest.raises(SystemExit):
         profile_throughput.parse_args()
-
-
-def test_parse_args_accepts_moe_trace_in_eager_mode(monkeypatch):
-    monkeypatch.setattr(sys, 'argv', [
-        'profile_throughput.py', 'openai/gsm8k', '/tmp/model', '--eager-mode', '--moe-trace-output',
-        '/tmp/routes.jsonl', '--max-input-len', '256', '--max-prefill-token-num', '8192'
-    ])
-
-    args = profile_throughput.parse_args()
-
-    assert args.moe_trace_output == '/tmp/routes.jsonl'
-    assert args.max_input_len == 256
-    assert args.max_prefill_token_num == 8192
-
-
-def test_parse_args_rejects_moe_trace_without_eager_mode(monkeypatch):
-    monkeypatch.setattr(sys, 'argv', [
-        'profile_throughput.py', 'openai/gsm8k', '/tmp/model', '--moe-trace-output', '/tmp/routes.jsonl'
-    ])
-
-    with pytest.raises(SystemExit):
-        profile_throughput.parse_args()

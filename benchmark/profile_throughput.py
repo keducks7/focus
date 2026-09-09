@@ -873,11 +873,6 @@ def parse_args():
     ArgumentHelper.dllm_enable_focus(pt_group)
     ArgumentHelper.dllm_focus_alpha(pt_group)
     ArgumentHelper.dllm_track(pt_group)
-    pt_group.add_argument('--moe-trace-output',
-                          type=str,
-                          default=None,
-                          help='Write LLaDA2 per-forward MoE expert-load histograms to this JSONL path. '
-                          'Requires --eager-mode and FOCUS disabled.')
 
     tp_act = ArgumentHelper.tp(pt_group)
     cache_count_act = ArgumentHelper.cache_max_entry_count(pt_group)
@@ -933,12 +928,6 @@ def parse_args():
     if args.max_prefill_token_num is not None and args.max_prefill_token_num <= 0:
         parser.error('--max-prefill-token-num must be a positive integer.')
 
-    if args.moe_trace_output is not None:
-        if not args.eager_mode:
-            parser.error('--moe-trace-output requires --eager-mode so every forward executes the trace hook.')
-        if args.dllm_enable_focus:
-            parser.error('--moe-trace-output currently supports FOCUS-disabled runs only.')
-
     if args.repeat_block_window is not None and args.repeat_block_window <= 0:
         parser.error('--repeat-block-window must be a positive integer when provided.')
 
@@ -959,9 +948,6 @@ def main():
     args = parse_args()
     assert args.backend == 'pytorch', 'only support pytorch backend now'
     random.seed(args.seed)
-    if args.moe_trace_output is not None:
-        args.moe_trace_output = os.path.abspath(args.moe_trace_output)
-        os.makedirs(os.path.dirname(args.moe_trace_output), exist_ok=True)
     max_prefill_token_num = args.max_prefill_token_num
     if max_prefill_token_num is None:
         max_prefill_token_num = args.concurrency * args.dllm_block_length \
@@ -1001,7 +987,6 @@ def main():
             dllm_enable_focus=args.dllm_enable_focus,
             dllm_focus_alpha=args.dllm_focus_alpha,
             dllm_track=args.dllm_track,
-            moe_trace_output=args.moe_trace_output,
             max_prefill_token_num=max_prefill_token_num,
         )
 
@@ -1066,8 +1051,6 @@ def main():
                    ('Skip detokenize', str(args.skip_detokenize).lower()),
                    ('Chat template', chat_template_name),
                    ('Repeat block detect', 'true' if args.repeat_block_detect else 'false')]
-    if args.moe_trace_output is not None:
-        hyperparams.append(('MoE trace output', args.moe_trace_output))
     if args.repeat_block_detect:
         hyperparams.extend([
             ('Repeat block window', args.repeat_block_window),

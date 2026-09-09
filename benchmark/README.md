@@ -69,9 +69,11 @@ python profile_throughput.py \
 
 ## LLaDA2 MoE expert-saturation experiment
 
-Use the controlled route-tracing runner to test whether the union of active
-experts saturates at a small request batch. Run the evaluation-task datasets
-separately so task-dependent routing remains visible:
+Use the controlled first-denoising-step runner to test whether the union of
+active experts saturates at a small request batch. It uses one Python process
+and HuggingFace Accelerate's balanced device map, avoiding LMDeploy's
+multi-process executor. Run task datasets separately so task-dependent routing
+remains visible:
 
 ```bash
 NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
@@ -86,18 +88,20 @@ NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
 ```
 
 The GSM8K run uses the `main` test split. The MBPP run uses the hand-verified
-`sanitized` test split. Only the sampled prompts are generated; neither run
-executes the full benchmark or evaluates answer correctness.
+`sanitized` test split. Neither run executes a full benchmark or evaluates
+answer correctness.
 
-Defaults target two 40 GB GPUs (`TP_SIZE=2`) and keep memory bounded with a
-128-token prompt cap and one 32-token generation block. The runner scans request
-batches `1 2 4 8 16 32`, enables delayed cache, and leaves FOCUS disabled. Its
-output directory contains:
+Defaults target two 40 GB GPUs, cap prompts at 128 tokens, and append one
+32-token all-mask block. For each batch, the profiler performs the initial
+denoising forward only and reads LLaDA2's official `output_router_logits`
+result. It counts routing for the mask block—not left-padding or prompt tokens.
+This isolates the maximum-query step while keeping batch size as the only swept
+variable. The output directory contains:
 
-- `routes_bs*.jsonl`: one expert-load histogram per MoE layer and real decode forward;
+- `routes_bs*.jsonl`: expert-load histograms for the initial all-mask block;
 - `moe_saturation_summary.csv`: overall and per-layer saturation statistics;
 - `moe_saturation.svg`: measured active-expert ratio and the uniform-routing null;
-- `trace_run_bs*.log`: trace-run engine output, which must not be used as clean latency data.
+- `hf_trace_run.log`: model placement and progress output.
 
 For a lower-memory smoke run:
 
@@ -107,11 +111,15 @@ MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8" \
   /path/to/dataset.json /path/to/LLaDA2.0-mini
 ```
 
-The analyzer excludes under-filled decode batches by default. This makes a
-configured concurrency count insufficient on its own: the trace's
-`actual_batch_size` is the batch size used in the reported curve.
-An OOM at a larger batch does not discard earlier data; the runner analyzes all
-successful smaller batches and points to the failed batch's `.err` log.
+The profiler loads the model only once. An OOM at a larger batch does not
+discard completed smaller-batch traces. `MAX_MEMORY_PER_GPU` defaults to
+`38GiB`; override it if other processes reserve memory.
+Set `MASK_BLOCK_LENGTH` to change the observed all-mask block length. The older
+`MAX_NEW_TOKENS` environment name remains accepted as a compatibility alias.
+
+Dependencies for this runner are `torch`, `transformers`, `accelerate`, and
+`datasets`. OpenCompass is not used: it is only needed later when checking that
+an acceleration method preserves task accuracy.
 
 ## profile restful api
 

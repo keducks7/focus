@@ -12,14 +12,12 @@ MODEL=$2
 OUTPUT_DIR=${3:-./results/llada2_moe_saturation}
 
 GPU_IDS=${CUDA_VISIBLE_DEVICES:-0,1}
-TP_SIZE=${TP_SIZE:-2}
 BATCH_SIZES_TEXT=${BATCH_SIZES:-"1 2 4 8 16 32"}
 NUM_PROMPTS=${NUM_PROMPTS:-64}
 MAX_INPUT_LEN=${MAX_INPUT_LEN:-128}
 MAX_SCAN_EXAMPLES=${MAX_SCAN_EXAMPLES:-20000}
-MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
-CACHE_MAX_ENTRY_COUNT=${CACHE_MAX_ENTRY_COUNT:-0.35}
-CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.8}
+MASK_BLOCK_LENGTH=${MASK_BLOCK_LENGTH:-${MAX_NEW_TOKENS:-32}}
+MAX_MEMORY_PER_GPU=${MAX_MEMORY_PER_GPU:-38GiB}
 
 read -r -a BATCH_SIZE_ARRAY <<< "${BATCH_SIZES_TEXT}"
 mkdir -p "${OUTPUT_DIR}"
@@ -36,67 +34,37 @@ fi
 
 echo "LLaDA2 MoE saturation experiment"
 echo "  GPUs:              ${GPU_IDS}"
-echo "  TP:                ${TP_SIZE}"
+echo "  loader:            HF Accelerate balanced device map"
 echo "  request batches:   ${BATCH_SIZES_TEXT}"
 echo "  max input tokens:  ${MAX_INPUT_LEN}"
-echo "  max output tokens: ${MAX_NEW_TOKENS}"
+echo "  observed mask block: ${MASK_BLOCK_LENGTH}"
 echo "  output:            ${OUTPUT_DIR}"
 
-SUCCESSFUL_TRACES=()
-FAILED_BATCHES=()
-for BATCH_SIZE in "${BATCH_SIZE_ARRAY[@]}"; do
-    TRACE_FILE="${OUTPUT_DIR}/routes_bs${BATCH_SIZE}.jsonl"
-    LOG_FILE="${OUTPUT_DIR}/trace_run_bs${BATCH_SIZE}.log"
-    ERROR_FILE="${OUTPUT_DIR}/trace_run_bs${BATCH_SIZE}.err"
-    CSV_FILE="${OUTPUT_DIR}/trace_run_bs${BATCH_SIZE}.csv"
-    MAX_PREFILL_TOKEN_NUM=$((BATCH_SIZE * MAX_INPUT_LEN))
+CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_llada2_hf_moe_saturation.py \
+    "${DATASET}" "${MODEL}" \
+    "${DATASET_ARGS[@]}" \
+    --output-dir "${OUTPUT_DIR}" \
+    --batch-sizes "${BATCH_SIZE_ARRAY[@]}" \
+    --num-prompts "${NUM_PROMPTS}" \
+    --max-input-len "${MAX_INPUT_LEN}" \
+    --max-scan-examples "${MAX_SCAN_EXAMPLES}" \
+    --block-length "${MASK_BLOCK_LENGTH}" \
+    --max-memory-per-gpu "${MAX_MEMORY_PER_GPU}" \
+    2>&1 | tee "${OUTPUT_DIR}/hf_trace_run.log"
 
-    echo "Running request batch ${BATCH_SIZE}..."
-    if CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_throughput.py \
-            "${DATASET}" "${MODEL}" \
-            "${DATASET_ARGS[@]}" \
-            --backend pytorch \
-            --tp "${TP_SIZE}" \
-            --distributed-executor-backend mp \
-            --dtype bfloat16 \
-            --eager-mode \
-            --cache-max-entry-count "${CACHE_MAX_ENTRY_COUNT}" \
-            --dllm-block-length 32 \
-            --dllm-denoising-steps 32 \
-            --dllm-confidence-threshold "${CONFIDENCE_THRESHOLD}" \
-            --dllm-enable-delayed-cache \
-            --dllm-track \
-            --max-new-tokens "${MAX_NEW_TOKENS}" \
-            --max-input-len "${MAX_INPUT_LEN}" \
-            --max-prefill-token-num "${MAX_PREFILL_TOKEN_NUM}" \
-            --max-scan-examples "${MAX_SCAN_EXAMPLES}" \
-            --num-prompts "${NUM_PROMPTS}" \
-            --concurrency "${BATCH_SIZE}" \
-            --temperature 0 \
-            --no-stream-output \
-            --skip-tokenize \
-            --skip-detokenize \
-            --moe-trace-output "${TRACE_FILE}" \
-            --csv "${CSV_FILE}" \
-            >"${LOG_FILE}" 2>"${ERROR_FILE}"; then
-        SUCCESSFUL_TRACES+=("${TRACE_FILE}")
-    else
-        FAILED_BATCHES+=("${BATCH_SIZE}")
-        echo "Batch ${BATCH_SIZE} failed; preserving earlier traces. See ${ERROR_FILE}." >&2
-    fi
-done
-
-if [[ ${#SUCCESSFUL_TRACES[@]} -eq 0 ]]; then
-    echo "No batch completed successfully." >&2
+MANIFEST="${OUTPUT_DIR}/successful_traces.txt"
+if [[ ! -s "${MANIFEST}" ]]; then
+    echo "No batch completed successfully. See ${OUTPUT_DIR}/hf_trace_run.log." >&2
     exit 1
 fi
+SUCCESSFUL_TRACES=()
+while IFS= read -r trace_path; do
+    [[ -n "${trace_path}" ]] && SUCCESSFUL_TRACES+=("${trace_path}")
+done < "${MANIFEST}"
 
 python benchmark/analyze_moe_saturation.py \
     "${SUCCESSFUL_TRACES[@]}" \
     --output-csv "${OUTPUT_DIR}/moe_saturation_summary.csv" \
     --output-svg "${OUTPUT_DIR}/moe_saturation.svg"
 
-if [[ ${#FAILED_BATCHES[@]} -gt 0 ]]; then
-    echo "Failed batches: ${FAILED_BATCHES[*]} (inspect trace_run_bs*.err)" >&2
-fi
 echo "Experiment complete: ${OUTPUT_DIR}"

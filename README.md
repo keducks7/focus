@@ -140,12 +140,13 @@ All scripts write logs to `./results`. Run them from the repo root.
     ./results/llada2_moe_saturation/mbpp
   ```
 
-  The default configuration is sized for two 40 GB GPUs: tensor parallelism 2,
-  BF16, one 32-token generation block, prompts capped at 128 tokens, and request
-  batches `1 2 4 8 16 32`. It runs delayed-cache without FOCUS, records one
-  expert-load histogram per MoE layer and decode forward, and produces a summary
-  CSV plus a dependency-free SVG saturation plot. Override resource limits with
-  environment variables, for example:
+  The default configuration is sized for two 40 GB GPUs. It loads the official
+  Transformers model once using HuggingFace Accelerate's balanced device map,
+  caps prompts at 128 tokens, appends one 32-token all-mask block, and scans
+  request batches `1 2 4 8 16 32`. The official `output_router_logits` return
+  value provides per-layer top-k expert IDs; no LMDeploy multiprocessing or
+  model-side tracing hook is used. Override resource limits with environment
+  variables, for example:
 
   ```bash
   MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8 16" \
@@ -153,21 +154,16 @@ All scripts write logs to `./results`. Run them from the repo root.
     /path/to/dataset.json /path/to/LLaDA2.0-mini
   ```
 
-  Route tracing requires eager mode and intentionally excludes FOCUS in this
-  first experiment. Histogram collection synchronizes once per forward, so use
-  the regular throughput scripts—not route traces—for clean latency numbers.
-  The analyzer excludes under-filled tail forwards by default and prints a
-  warning when it encounters them; pass `--include-partial-batches` only for
-  exploratory inspection.
-  The runner sets the prefill-token budget to `batch_size * MAX_INPUT_LEN` so
-  short prompts can enter decoding together instead of silently producing
-  under-filled physical batches.
-  If a larger batch runs out of memory, the runner preserves and summarizes all
-  smaller successful batches and reports the failed batch separately.
+  This is a routing observation, not a latency benchmark. Every observation is
+  the initial denoising forward of an all-mask block, and only those mask-token
+  routes are counted. Use the regular throughput scripts for clean latency
+  numbers. If a larger batch runs out of memory, completed smaller-batch traces
+  remain available.
 
   The examples intentionally sample only 64 prompts from the GSM8K `main` test
   split and the MBPP `sanitized` test split. They profile routing behavior only;
-  they do not run the full datasets or score generated answers.
+  they do not generate complete answers or score them. OpenCompass is reserved
+  for the later quality-preservation evaluation, not this motivation experiment.
 
 Dataset notes:
 - `dataset_id` can be a HuggingFace dataset ID or a local JSON/JSONL path supported by `benchmark/profile_throughput.py`.
