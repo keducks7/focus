@@ -198,6 +198,23 @@ def test_extract_gsm8k_messages():
     assert profile_throughput._extract_messages(row, dataset_format='auto') == expected
 
 
+def test_extract_mbpp_messages():
+    row = {
+        'prompt': 'Write a function that adds two integers.',
+        'code': 'def add(a, b):\n    return a + b',
+        'test_list': ['assert add(1, 2) == 3', 'assert add(-1, 1) == 0'],
+    }
+
+    messages = profile_throughput._extract_messages(row, dataset_format='mbpp')
+
+    assert messages is not None
+    assert messages[0]['role'] == 'user'
+    assert row['prompt'] in messages[0]['content']
+    assert row['test_list'][0] in messages[0]['content']
+    assert messages[1] == {'role': 'assistant', 'content': row['code']}
+    assert profile_throughput._extract_messages(row, dataset_format='auto') == messages
+
+
 def test_gsm8k_split_candidates():
     assert profile_throughput._get_hf_split_candidates('openai/gsm8k', 'test') == ('test', 'validation')
     assert profile_throughput._get_hf_split_candidates('openai/gsm8k', 'validation') == ('validation', 'test')
@@ -213,8 +230,50 @@ def test_parse_args_defaults_gsm8k_to_test_split_and_main_config(monkeypatch):
     assert args.hf_config == 'main'
 
 
+def test_parse_args_defaults_mbpp_to_sanitized_test(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', [
+        'profile_throughput.py', 'google-research-datasets/mbpp', '/tmp/model'
+    ])
+    args = profile_throughput.parse_args()
+
+    assert args.dataset_format == 'auto'
+    assert args.hf_split == 'test'
+    assert args.hf_config == 'sanitized'
+
+
+def test_parse_args_rejects_non_test_split_for_mbpp(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', [
+        'profile_throughput.py', 'google-research-datasets/mbpp', '/tmp/model', '--hf-split', 'train'
+    ])
+
+    with pytest.raises(SystemExit):
+        profile_throughput.parse_args()
+
+
 def test_parse_args_rejects_non_test_split_for_gsm8k(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['profile_throughput.py', 'openai/gsm8k', '/tmp/model', '--hf-split', 'train'])
+
+    with pytest.raises(SystemExit):
+        profile_throughput.parse_args()
+
+
+def test_parse_args_accepts_moe_trace_in_eager_mode(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', [
+        'profile_throughput.py', 'openai/gsm8k', '/tmp/model', '--eager-mode', '--moe-trace-output',
+        '/tmp/routes.jsonl', '--max-input-len', '256', '--max-prefill-token-num', '8192'
+    ])
+
+    args = profile_throughput.parse_args()
+
+    assert args.moe_trace_output == '/tmp/routes.jsonl'
+    assert args.max_input_len == 256
+    assert args.max_prefill_token_num == 8192
+
+
+def test_parse_args_rejects_moe_trace_without_eager_mode(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', [
+        'profile_throughput.py', 'openai/gsm8k', '/tmp/model', '--moe-trace-output', '/tmp/routes.jsonl'
+    ])
 
     with pytest.raises(SystemExit):
         profile_throughput.parse_args()

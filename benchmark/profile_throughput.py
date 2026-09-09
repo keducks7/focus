@@ -30,10 +30,17 @@ GSM8K_DATASET_ID = 'openai/gsm8k'
 GSM8K_DEFAULT_CONFIG = 'main'
 GSM8K_SUPPORTED_SPLIT = 'test'
 GSM8K_FALLBACK_SPLIT = 'validation'
+MBPP_DATASET_ID = 'google-research-datasets/mbpp'
+MBPP_DEFAULT_CONFIG = 'sanitized'
+MBPP_SUPPORTED_SPLIT = 'test'
 
 
 def _is_gsm8k_dataset(dataset_id: str) -> bool:
     return dataset_id.strip().lower() == GSM8K_DATASET_ID
+
+
+def _is_mbpp_dataset(dataset_id: str) -> bool:
+    return dataset_id.strip().lower() == MBPP_DATASET_ID
 
 
 def _get_hf_split_candidates(dataset_id: str, split: str) -> Tuple[str, ...]:
@@ -82,6 +89,32 @@ def _extract_math_messages(example: Dict[str, Any],
     ]
 
 
+def _extract_mbpp_messages(example: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
+    task = example.get('prompt', example.get('text'))
+    solution = example.get('code')
+    if task is None or solution is None:
+        return None
+    task_text = str(task).strip()
+    solution_text = str(solution).strip()
+    if not task_text or not solution_text:
+        return None
+
+    tests = example.get('test_list')
+    if isinstance(tests, (list, tuple)):
+        tests_text = '\n'.join(str(test).strip() for test in tests if str(test).strip())
+    else:
+        tests_text = str(tests).strip() if tests is not None else ''
+
+    prompt = f'You are an expert Python programmer.\n{task_text}'
+    if tests_text:
+        prompt += f'\nYour code should pass these tests:\n\n{tests_text}'
+    prompt += '\nReturn only the completed Python code.'
+    return [
+        {'role': 'user', 'content': prompt},
+        {'role': 'assistant', 'content': solution_text},
+    ]
+
+
 def _normalize_role(role: Any) -> str:
     role = str(role).strip().lower()
     if role in ('human', 'user'):
@@ -99,6 +132,12 @@ def _extract_messages(example: Dict[str, Any], dataset_format: DatasetFormat = '
         return _extract_math_messages(example)
     if dataset_format == 'gsm8k':
         return _extract_math_messages(example, prompt_keys=('question',), solution_keys=('answer',))
+    if dataset_format == 'mbpp':
+        return _extract_mbpp_messages(example)
+    if dataset_format == 'auto' and ('prompt' in example or 'text' in example) and 'code' in example:
+        messages = _extract_mbpp_messages(example)
+        if messages is not None:
+            return messages
     if dataset_format == 'auto' and _looks_like_math(example):
         messages = _extract_math_messages(example)
         if messages is not None:
@@ -338,6 +377,7 @@ def sample_requests(
     hf_data_file: Optional[str] = None,
     hf_revision: Optional[str] = None,
     max_scan_examples: Optional[int] = None,
+    max_input_len: Optional[int] = None,
     seed: Optional[int] = None,
 ) -> List[Tuple[str, int]]:
     """Sample requests from dataset for DLLM benchmarking.
@@ -418,6 +458,8 @@ def sample_requests(
         # Apply filters for prompt length only (no output length filtering)
         if prompt_len < 4 or output_len < 4:
             # Prune too short sequences.
+            continue
+        if max_input_len is not None and prompt_len > max_input_len:
             continue
             
         filtered_dataset.append((prompt, prompt_len))
@@ -720,7 +762,8 @@ def parse_args():
     parser.add_argument('dataset',
                         type=str,
                         help='Dataset path (.json/.jsonl) or HuggingFace dataset ID '
-                        '(e.g. allenai/WildChat, nlile/hendrycks-MATH-benchmark, openai/gsm8k).')
+                        '(e.g. allenai/WildChat, nlile/hendrycks-MATH-benchmark, openai/gsm8k, '
+                        'google-research-datasets/mbpp).')
     parser.add_argument('model_path',
                         type=str,
                         help='the path of model in localhost or '
@@ -728,9 +771,9 @@ def parse_args():
     parser.add_argument('--dataset-format',
                         type=str,
                         default='auto',
-                        choices=['auto', 'sharegpt', 'wildchat', 'math', 'gsm8k'],
+                        choices=['auto', 'sharegpt', 'wildchat', 'math', 'gsm8k', 'mbpp'],
                         help='Dataset format: ShareGPT JSON, WildChat (HF or JSON/JSONL), '
-                        'Hendrycks MATH, GSM8K, or auto-detect.')
+                        'Hendrycks MATH, GSM8K, MBPP, or auto-detect.')
     parser.add_argument('--hf-split',
                         type=str,
                         default=None,
@@ -764,6 +807,10 @@ def parse_args():
                         type=int,
                         default=None,
                         help='Optional cap on how many dataset rows to scan while sampling prompts.')
+    parser.add_argument('--max-input-len',
+                        type=int,
+                        default=None,
+                        help='Discard sampled prompts longer than this many tokens.')
     parser.add_argument('-c',
                         '--concurrency',
                         type=int,
@@ -786,6 +833,10 @@ def parse_args():
                         default=None,
                         choices=['uni', 'mp', 'ray'],
                         help='backend of executor backend')
+    parser.add_argument('--max-prefill-token-num',
+                        type=int,
+                        default=None,
+                        help='Maximum prefill tokens per iteration. Defaults to concurrency times DLLM block length.')
     parser.add_argument(
         '--max-new-tokens',
         type=int,
@@ -822,6 +873,11 @@ def parse_args():
     ArgumentHelper.dllm_enable_focus(pt_group)
     ArgumentHelper.dllm_focus_alpha(pt_group)
     ArgumentHelper.dllm_track(pt_group)
+    pt_group.add_argument('--moe-trace-output',
+                          type=str,
+                          default=None,
+                          help='Write LLaDA2 per-forward MoE expert-load histograms to this JSONL path. '
+                          'Requires --eager-mode and FOCUS disabled.')
 
     tp_act = ArgumentHelper.tp(pt_group)
     cache_count_act = ArgumentHelper.cache_max_entry_count(pt_group)
@@ -849,7 +905,12 @@ def parse_args():
     args = parser.parse_args()
 
     if args.hf_split is None:
-        args.hf_split = GSM8K_SUPPORTED_SPLIT if _is_gsm8k_dataset(args.dataset) else 'train'
+        if _is_gsm8k_dataset(args.dataset):
+            args.hf_split = GSM8K_SUPPORTED_SPLIT
+        elif _is_mbpp_dataset(args.dataset):
+            args.hf_split = MBPP_SUPPORTED_SPLIT
+        else:
+            args.hf_split = 'train'
 
     if _is_gsm8k_dataset(args.dataset):
         if args.hf_split != GSM8K_SUPPORTED_SPLIT:
@@ -857,8 +918,26 @@ def parse_args():
         if args.hf_config is None:
             args.hf_config = GSM8K_DEFAULT_CONFIG
 
+    if _is_mbpp_dataset(args.dataset):
+        if args.hf_split != MBPP_SUPPORTED_SPLIT:
+            parser.error(f'`{MBPP_DATASET_ID}` is supported with the `{MBPP_SUPPORTED_SPLIT}` split only.')
+        if args.hf_config is None:
+            args.hf_config = MBPP_DEFAULT_CONFIG
+
     if args.repeat_block_threshold < 2:
         parser.error('--repeat-block-threshold must be >= 2.')
+
+    if args.max_input_len is not None and args.max_input_len <= 0:
+        parser.error('--max-input-len must be a positive integer.')
+
+    if args.max_prefill_token_num is not None and args.max_prefill_token_num <= 0:
+        parser.error('--max-prefill-token-num must be a positive integer.')
+
+    if args.moe_trace_output is not None:
+        if not args.eager_mode:
+            parser.error('--moe-trace-output requires --eager-mode so every forward executes the trace hook.')
+        if args.dllm_enable_focus:
+            parser.error('--moe-trace-output currently supports FOCUS-disabled runs only.')
 
     if args.repeat_block_window is not None and args.repeat_block_window <= 0:
         parser.error('--repeat-block-window must be a positive integer when provided.')
@@ -880,6 +959,13 @@ def main():
     args = parse_args()
     assert args.backend == 'pytorch', 'only support pytorch backend now'
     random.seed(args.seed)
+    if args.moe_trace_output is not None:
+        args.moe_trace_output = os.path.abspath(args.moe_trace_output)
+        os.makedirs(os.path.dirname(args.moe_trace_output), exist_ok=True)
+    max_prefill_token_num = args.max_prefill_token_num
+    if max_prefill_token_num is None:
+        max_prefill_token_num = args.concurrency * args.dllm_block_length \
+            if args.dllm_block_length is not None else 4096
     if args.backend == 'turbomind':
         engine_config = TurbomindEngineConfig(
             max_batch_size=args.concurrency // args.dp,
@@ -915,7 +1001,8 @@ def main():
             dllm_enable_focus=args.dllm_enable_focus,
             dllm_focus_alpha=args.dllm_focus_alpha,
             dllm_track=args.dllm_track,
-            max_prefill_token_num=args.concurrency * args.dllm_block_length if args.dllm_block_length is not None else 4096,
+            moe_trace_output=args.moe_trace_output,
+            max_prefill_token_num=max_prefill_token_num,
         )
 
     if args.use_uvloop:
@@ -940,6 +1027,7 @@ def main():
         hf_data_file=args.hf_data_file,
         hf_revision=args.hf_revision,
         max_scan_examples=args.max_scan_examples,
+        max_input_len=args.max_input_len,
         seed=args.seed,
     )
     actual_num_prompts = len(requests)
@@ -970,12 +1058,16 @@ def main():
     hyperparams = [('Concurrency', args.concurrency),
                    ('Prompts requested', args.num_prompts),
                    ('Prompts sampled', actual_num_prompts),
+                   ('Max input length', args.max_input_len if args.max_input_len is not None else '-'),
+                   ('Max prefill tokens', max_prefill_token_num),
                    ('Max new tokens', args.max_new_tokens),
                    ('Stream output', str(stream_output).lower()),
                    ('Skip tokenize', str(args.skip_tokenize).lower()),
                    ('Skip detokenize', str(args.skip_detokenize).lower()),
                    ('Chat template', chat_template_name),
                    ('Repeat block detect', 'true' if args.repeat_block_detect else 'false')]
+    if args.moe_trace_output is not None:
+        hyperparams.append(('MoE trace output', args.moe_trace_output))
     if args.repeat_block_detect:
         hyperparams.extend([
             ('Repeat block window', args.repeat_block_window),
@@ -1004,6 +1096,8 @@ def main():
             ('backend', args.backend),
             ('bs', args.concurrency),
             ('max_new_tokens', args.max_new_tokens),
+            ('max_input_len', args.max_input_len if args.max_input_len is not None else '-'),
+            ('max_prefill_token_num', max_prefill_token_num),
             ('num_prompts', actual_num_prompts),
             ('chat_template', chat_template_name),
             ('repeat_block_detect', str(args.repeat_block_detect).lower()),

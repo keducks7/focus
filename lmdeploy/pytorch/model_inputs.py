@@ -739,6 +739,8 @@ class BuildModelContext:
     dllm_config: DLLMConfig = None
     strategy_factory: 'StrategyFactoryBase' = None
     enable_return_routed_experts: bool = False
+    # Optional JSONL output used by model-side MoE routing instrumentation.
+    moe_trace_output: str = None
     # Maximum batch size configured for the engine (used for buffer preallocation).
     max_batch_size: int = 1
     # Persistent pinned host buffer for FOCUS metadata (avoid per-forward allocations).

@@ -67,6 +67,52 @@ python profile_throughput.py \
 
 `openai/gsm8k` defaults to the `main` config and `test` split. If your local `datasets` metadata exposes the evaluation split as `validation`, the loader falls back automatically.
 
+## LLaDA2 MoE expert-saturation experiment
+
+Use the controlled route-tracing runner to test whether the union of active
+experts saturates at a small request batch. Run the evaluation-task datasets
+separately so task-dependent routing remains visible:
+
+```bash
+NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+  benchmark/run_llada2_moe_saturation.sh \
+  openai/gsm8k inclusionAI/LLaDA2.0-mini \
+  ./results/llada2_moe_saturation/gsm8k
+
+NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+  benchmark/run_llada2_moe_saturation.sh \
+  google-research-datasets/mbpp inclusionAI/LLaDA2.0-mini \
+  ./results/llada2_moe_saturation/mbpp
+```
+
+The GSM8K run uses the `main` test split. The MBPP run uses the hand-verified
+`sanitized` test split. Only the sampled prompts are generated; neither run
+executes the full benchmark or evaluates answer correctness.
+
+Defaults target two 40 GB GPUs (`TP_SIZE=2`) and keep memory bounded with a
+128-token prompt cap and one 32-token generation block. The runner scans request
+batches `1 2 4 8 16 32`, enables delayed cache, and leaves FOCUS disabled. Its
+output directory contains:
+
+- `routes_bs*.jsonl`: one expert-load histogram per MoE layer and real decode forward;
+- `moe_saturation_summary.csv`: overall and per-layer saturation statistics;
+- `moe_saturation.svg`: measured active-expert ratio and the uniform-routing null;
+- `trace_run_bs*.log`: trace-run engine output, which must not be used as clean latency data.
+
+For a lower-memory smoke run:
+
+```bash
+MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8" \
+  benchmark/run_llada2_moe_saturation.sh \
+  /path/to/dataset.json /path/to/LLaDA2.0-mini
+```
+
+The analyzer excludes under-filled decode batches by default. This makes a
+configured concurrency count insufficient on its own: the trace's
+`actual_batch_size` is the batch size used in the reported curve.
+An OOM at a larger batch does not discard earlier data; the runner analyzes all
+successful smaller batches and points to the failed batch's `.err` log.
+
 ## profile restful api
 
 `profile_restful_api.py` is used to do benchmark on api server.

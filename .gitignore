@@ -99,3 +99,6 @@ results/
 Figures/
 
 .codex
+
+# macOS metadata
+.DS_Store

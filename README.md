@@ -125,6 +125,50 @@ All scripts write logs to `./results`. Run them from the repo root.
 
   This runs `JetLM/SDAR-8B-Chat-b32` with delayed cache enabled and FOCUS disabled.
 
+- LLaDA2 MoE expert-saturation motivation experiment:
+  [`benchmark/run_llada2_moe_saturation.sh`](benchmark/run_llada2_moe_saturation.sh)
+
+  ```bash
+  NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+    benchmark/run_llada2_moe_saturation.sh \
+    openai/gsm8k inclusionAI/LLaDA2.0-mini \
+    ./results/llada2_moe_saturation/gsm8k
+
+  NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+    benchmark/run_llada2_moe_saturation.sh \
+    google-research-datasets/mbpp inclusionAI/LLaDA2.0-mini \
+    ./results/llada2_moe_saturation/mbpp
+  ```
+
+  The default configuration is sized for two 40 GB GPUs: tensor parallelism 2,
+  BF16, one 32-token generation block, prompts capped at 128 tokens, and request
+  batches `1 2 4 8 16 32`. It runs delayed-cache without FOCUS, records one
+  expert-load histogram per MoE layer and decode forward, and produces a summary
+  CSV plus a dependency-free SVG saturation plot. Override resource limits with
+  environment variables, for example:
+
+  ```bash
+  MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8 16" \
+    benchmark/run_llada2_moe_saturation.sh \
+    /path/to/dataset.json /path/to/LLaDA2.0-mini
+  ```
+
+  Route tracing requires eager mode and intentionally excludes FOCUS in this
+  first experiment. Histogram collection synchronizes once per forward, so use
+  the regular throughput scripts—not route traces—for clean latency numbers.
+  The analyzer excludes under-filled tail forwards by default and prints a
+  warning when it encounters them; pass `--include-partial-batches` only for
+  exploratory inspection.
+  The runner sets the prefill-token budget to `batch_size * MAX_INPUT_LEN` so
+  short prompts can enter decoding together instead of silently producing
+  under-filled physical batches.
+  If a larger batch runs out of memory, the runner preserves and summarizes all
+  smaller successful batches and reports the failed batch separately.
+
+  The examples intentionally sample only 64 prompts from the GSM8K `main` test
+  split and the MBPP `sanitized` test split. They profile routing behavior only;
+  they do not run the full datasets or score generated answers.
+
 Dataset notes:
 - `dataset_id` can be a HuggingFace dataset ID or a local JSON/JSONL path supported by `benchmark/profile_throughput.py`.
 - HuggingFace dataset IDs require the `datasets` package and network access.
