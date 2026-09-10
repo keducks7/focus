@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460">
+<rect width="100%" height="100%" fill="white"/>
+<text x="380" y="22" text-anchor="middle" font-family="sans-serif" font-size="16">LLaDA2 MoE Expert Saturation</text>
+<line x1="80" y1="395.0" x2="730" y2="395.0" stroke="#dddddd"/>
+<text x="70" y="399.0" text-anchor="end" font-family="sans-serif" font-size="12">0%</text>
+<line x1="80" y1="323.0" x2="730" y2="323.0" stroke="#dddddd"/>
+<text x="70" y="327.0" text-anchor="end" font-family="sans-serif" font-size="12">20%</text>
+<line x1="80" y1="251.0" x2="730" y2="251.0" stroke="#dddddd"/>
+<text x="70" y="255.0" text-anchor="end" font-family="sans-serif" font-size="12">40%</text>
+<line x1="80" y1="179.0" x2="730" y2="179.0" stroke="#dddddd"/>
+<text x="70" y="183.0" text-anchor="end" font-family="sans-serif" font-size="12">60%</text>
+<line x1="80" y1="107.0" x2="730" y2="107.0" stroke="#dddddd"/>
+<text x="70" y="111.0" text-anchor="end" font-family="sans-serif" font-size="12">80%</text>
+<line x1="80" y1="35.0" x2="730" y2="35.0" stroke="#dddddd"/>
+<text x="70" y="39.0" text-anchor="end" font-family="sans-serif" font-size="12">100%</text>
+<line x1="80" y1="35" x2="80" y2="395" stroke="#222222"/>
+<line x1="80" y1="395" x2="730" y2="395" stroke="#222222"/>
+<text x="80.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">1</text>
+<text x="210.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">2</text>
+<text x="340.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">4</text>
+<text x="470.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">8</text>
+<text x="600.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">16</text>
+<text x="730.0" y="417" text-anchor="middle" font-family="sans-serif" font-size="12">32</text>
+<polyline points="80.0,165.3 210.0,82.2 340.0,41.2 470.0,35.1 600.0,35.0 730.0,35.0" fill="none" stroke="#999999" stroke-width="2" stroke-dasharray="6 4"/>
+<polyline points="80.0,334.5 210.0,318.2 340.0,301.7 470.0,285.2 600.0,268.3 730.0,251.7" fill="none" stroke="#1769aa" stroke-width="3"/>
+<circle cx="80.0" cy="334.5" r="4" fill="#1769aa"/>
+<circle cx="210.0" cy="318.2" r="4" fill="#1769aa"/>
+<circle cx="340.0" cy="301.7" r="4" fill="#1769aa"/>
+<circle cx="470.0" cy="285.2" r="4" fill="#1769aa"/>
+<circle cx="600.0" cy="268.3" r="4" fill="#1769aa"/>
+<circle cx="730.0" cy="251.7" r="4" fill="#1769aa"/>
+<text x="405.0" y="445" text-anchor="middle" font-family="sans-serif" font-size="13">Configured request batch size</text>
+<text x="18" y="215.0" text-anchor="middle" transform="rotate(-90 18 215.0)" font-family="sans-serif" font-size="13">Active expert ratio</text>
+<line x1="540" y1="48" x2="570" y2="48" stroke="#1769aa" stroke-width="3"/>
+<text x="578" y="52" font-family="sans-serif" font-size="12">Measured</text>
+<line x1="650" y1="48" x2="680" y2="48" stroke="#999999" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="688" y="52" font-family="sans-serif" font-size="12">Uniform null</text>
+</svg>
