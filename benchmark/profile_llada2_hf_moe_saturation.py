@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Profile first-denoising-step MoE routing with HF Accelerate.
+"""Profile full single-block denoising MoE routing with HF Accelerate.
 
 This path intentionally avoids LMDeploy's multi-process executor.  The model is
 loaded once with a balanced two-GPU device map, and LLaDA2's official
 ``output_router_logits`` result is used instead of a model-side tracing hook.
+Only unresolved mask queries are counted at each denoising step.
 """
 
 import argparse
@@ -158,8 +159,8 @@ def _build_batch_inputs(prompt_ids, block_length, pad_id, mask_id, device, dtype
     return input_ids, attention_mask, position_ids
 
 
-def _router_layers(router_outputs, block_length, num_experts, first_moe_layer):
-    """Convert official per-layer router outputs to trace layer records."""
+def _router_layers(router_outputs, active_mask, num_experts, first_moe_layer):
+    """Count expert assignments for unresolved mask positions only."""
     import torch
 
     layers = []
@@ -170,8 +171,9 @@ def _router_layers(router_outputs, block_length, num_experts, first_moe_layer):
             topk_ids = router_output[1]
         else:
             raise RuntimeError('Unexpected LLaDA2 router output; expected (router_logits, topk_ids).')
-        topk_ids = topk_ids[:, -block_length:, :].reshape(-1)
-        expert_load = torch.bincount(topk_ids, minlength=num_experts).to('cpu', dtype=torch.int64).tolist()
+        block_topk = topk_ids[:, -active_mask.shape[1]:, :]
+        selected_topk = block_topk[active_mask.to(block_topk.device)].reshape(-1)
+        expert_load = torch.bincount(selected_topk, minlength=num_experts).to('cpu', dtype=torch.int64).tolist()
         layers.append({
             'layer_idx': first_moe_layer + offset,
             'active_experts': sum(load > 0 for load in expert_load),
@@ -181,30 +183,85 @@ def _router_layers(router_outputs, block_length, num_experts, first_moe_layer):
     return layers
 
 
+def _transfer_schedule(block_length, denoising_steps):
+    """Return the minimum number of tokens accepted per sequence and step."""
+    denoising_steps = min(denoising_steps, block_length)
+    base, remainder = divmod(block_length, denoising_steps)
+    return [base + (step < remainder) for step in range(denoising_steps)]
+
+
+def _sample_block(logits, temperature):
+    """Sample candidates, using true greedy decoding at temperature zero."""
+    import torch
+
+    logits = logits.float()
+    if temperature <= 0:
+        probabilities = torch.softmax(logits, dim=-1)
+        confidence, token_ids = probabilities.max(dim=-1)
+        return token_ids, confidence
+    probabilities = torch.softmax(logits / temperature, dim=-1)
+    flat = probabilities.reshape(-1, probabilities.shape[-1])
+    sampled = torch.multinomial(flat, num_samples=1).reshape(probabilities.shape[:-1])
+    confidence = probabilities.gather(-1, sampled.unsqueeze(-1)).squeeze(-1)
+    return sampled, confidence
+
+
+def _accept_candidates(current_block, active_mask, candidates, confidence, minimum_transfer, threshold):
+    """Apply LLaDA2's confidence-or-minimum-transfer update independently per request."""
+    import torch
+
+    transferred = []
+    for batch_index in range(current_block.shape[0]):
+        active = active_mask[batch_index]
+        active_count = int(active.sum().item())
+        if active_count == 0:
+            transferred.append(0)
+            continue
+        high_confidence = active & (confidence[batch_index] > threshold)
+        if int(high_confidence.sum().item()) >= minimum_transfer:
+            selected = high_confidence
+        else:
+            selected = torch.zeros_like(active)
+            masked_confidence = confidence[batch_index].masked_fill(~active, float('-inf'))
+            count = min(minimum_transfer, active_count)
+            indices = torch.topk(masked_confidence, k=count).indices
+            selected[indices] = True
+        current_block[batch_index, selected] = candidates[batch_index, selected]
+        transferred.append(int(selected.sum().item()))
+    return transferred
+
+
 def _write_metadata(stream, args, batch_size, config):
     stream.write(json.dumps({
         'record_type': 'metadata',
-        'format_version': 1,
-        'model_type': 'llada2_moe_hf_first_denoising_step',
+        'format_version': 2,
+        'model_type': 'llada2_moe_hf_full_denoising',
         'num_experts': int(config.num_experts),
         'top_k': int(config.num_experts_per_tok),
         'num_hidden_layers': int(config.num_hidden_layers),
         'configured_batch_size': batch_size,
-        'observed_region': 'initial_all_mask_block',
+        'observed_region': 'unresolved_mask_queries',
         'block_length': args.block_length,
+        'requested_denoising_steps': args.denoising_steps,
+        'effective_denoising_steps': min(args.denoising_steps, args.block_length),
+        'confidence_threshold': args.confidence_threshold,
+        'temperature': args.temperature,
     }, separators=(',', ':')) + '\n')
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='LLaDA2 HF/Accelerate MoE saturation profiler.')
+    parser = argparse.ArgumentParser(description='LLaDA2 HF/Accelerate MoE denoising-route profiler.')
     parser.add_argument('dataset')
     parser.add_argument('model_path')
     parser.add_argument('--output-dir', required=True)
-    parser.add_argument('--batch-sizes', nargs='+', type=int, default=[1, 2, 4, 8, 16, 32])
-    parser.add_argument('--num-prompts', type=int, default=64)
+    parser.add_argument('--batch-sizes', nargs='+', type=int, default=[8])
+    parser.add_argument('--num-prompts', type=int, default=32)
     parser.add_argument('--max-input-len', type=int, default=128)
     parser.add_argument('--max-scan-examples', type=int, default=20000)
     parser.add_argument('--block-length', type=int, default=32)
+    parser.add_argument('--denoising-steps', type=int, default=32)
+    parser.add_argument('--confidence-threshold', type=float, default=0.95)
+    parser.add_argument('--temperature', type=float, default=0.0)
     parser.add_argument('--dataset-format', choices=['auto', 'gsm8k', 'mbpp', 'math'], default='auto')
     parser.add_argument('--hf-split', default=None)
     parser.add_argument('--hf-config', default=None)
@@ -215,6 +272,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.block_length <= 0 or args.denoising_steps <= 0:
+        raise ValueError('block length and denoising steps must be positive.')
+    if not 0 <= args.confidence_threshold <= 1:
+        raise ValueError('confidence threshold must be in [0, 1].')
     if args.dataset == GSM8K_DATASET_ID:
         args.dataset_format = 'gsm8k'
         args.hf_config = args.hf_config or 'main'
@@ -251,6 +312,8 @@ def main():
         attn_implementation='eager',
     )
     model.eval()
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     print(f'Device map: {getattr(model, "hf_device_map", None)}', flush=True)
 
     config = model.config
@@ -260,7 +323,10 @@ def main():
     if mask_id is None:
         raise RuntimeError('Tokenizer has no mask_token_id; LLaDA2 requires <|mask|>.')
     pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+    if pad_id is None:
+        raise RuntimeError('Tokenizer has neither pad_token_id nor eos_token_id.')
     first_moe_layer = int(getattr(config, 'first_k_dense_replace', 0))
+    transfer_schedule = _transfer_schedule(args.block_length, args.denoising_steps)
     successful = []
 
     for batch_size in args.batch_sizes:
@@ -278,30 +344,61 @@ def main():
                     group = prompt_ids[start:start + batch_size]
                     input_ids, attention_mask, position_ids = _build_batch_inputs(
                         group, args.block_length, pad_id, mask_id, input_device, torch.bfloat16)
-                    with torch.inference_mode():
-                        outputs = core_model(
-                            input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            position_ids=position_ids,
-                            use_cache=False,
-                            output_router_logits=True,
-                            return_dict=True,
+                    current_block = input_ids[:, -args.block_length:]
+                    for step, minimum_transfer in enumerate(transfer_schedule):
+                        active_mask = current_block.eq(mask_id)
+                        q_seqlens = active_mask.sum(dim=1).to('cpu', dtype=torch.int64).tolist()
+                        query_tokens = int(sum(q_seqlens))
+                        if query_tokens == 0:
+                            break
+                        with torch.inference_mode():
+                            outputs = core_model(
+                                input_ids=input_ids,
+                                attention_mask=attention_mask,
+                                position_ids=position_ids,
+                                use_cache=False,
+                                output_router_logits=True,
+                                return_dict=True,
+                            )
+                            layers = _router_layers(
+                                outputs.router_logits,
+                                active_mask,
+                                int(config.num_experts),
+                                first_moe_layer,
+                            )
+                            block_hidden = outputs.last_hidden_state[:, -args.block_length:, :]
+                            logits = model.lm_head(block_hidden)
+                            candidates, confidence = _sample_block(logits, args.temperature)
+                            transferred = _accept_candidates(
+                                current_block,
+                                active_mask,
+                                candidates.to(current_block.device),
+                                confidence.to(current_block.device),
+                                minimum_transfer,
+                                args.confidence_threshold,
+                            )
+                        remaining_after = current_block.eq(mask_id).sum(dim=1).to('cpu', dtype=torch.int64).tolist()
+                        print(
+                            f'  batch={batch_size} group={forward_index + 1}/{full_groups} '
+                            f'step={step + 1}/{len(transfer_schedule)} '
+                            f'Q={query_tokens}->{sum(remaining_after)}',
+                            flush=True,
                         )
-                    layers = _router_layers(
-                        outputs.router_logits,
-                        args.block_length,
-                        int(config.num_experts),
-                        first_moe_layer,
-                    )
-                    stream.write(json.dumps({
-                        'record_type': 'decode_forward',
-                        'forward_index': forward_index,
-                        'actual_batch_size': batch_size,
-                        'query_tokens': batch_size * args.block_length,
-                        'q_seqlens': [args.block_length] * batch_size,
-                        'layers': layers,
-                    }, separators=(',', ':')) + '\n')
-                    del outputs, input_ids, attention_mask, position_ids
+                        stream.write(json.dumps({
+                            'record_type': 'denoising_step',
+                            'forward_index': forward_index * len(transfer_schedule) + step,
+                            'group_id': forward_index,
+                            'step': step,
+                            'actual_batch_size': batch_size,
+                            'query_tokens': query_tokens,
+                            'q_seqlens': q_seqlens,
+                            'minimum_transfer': minimum_transfer,
+                            'transferred_per_sequence': transferred,
+                            'remaining_after_per_sequence': remaining_after,
+                            'layers': layers,
+                        }, separators=(',', ':')) + '\n')
+                        del outputs, block_hidden, logits, candidates, confidence, layers
+                    del current_block, input_ids, attention_mask, position_ids
             successful.append(trace_path)
         except torch.OutOfMemoryError:
             print(f'Batch {batch_size} ran out of memory; keeping smaller completed traces.', flush=True)

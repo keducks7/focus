@@ -12,11 +12,14 @@ MODEL=$2
 OUTPUT_DIR=${3:-./results/llada2_moe_saturation}
 
 GPU_IDS=${CUDA_VISIBLE_DEVICES:-0,1}
-BATCH_SIZES_TEXT=${BATCH_SIZES:-"1 2 4 8 16 32"}
-NUM_PROMPTS=${NUM_PROMPTS:-64}
+BATCH_SIZES_TEXT=${BATCH_SIZES:-"8"}
+NUM_PROMPTS=${NUM_PROMPTS:-32}
 MAX_INPUT_LEN=${MAX_INPUT_LEN:-128}
 MAX_SCAN_EXAMPLES=${MAX_SCAN_EXAMPLES:-20000}
 MASK_BLOCK_LENGTH=${MASK_BLOCK_LENGTH:-${MAX_NEW_TOKENS:-32}}
+DENOISING_STEPS=${DENOISING_STEPS:-32}
+CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.95}
+TEMPERATURE=${TEMPERATURE:-0}
 MAX_MEMORY_PER_GPU=${MAX_MEMORY_PER_GPU:-38GiB}
 
 read -r -a BATCH_SIZE_ARRAY <<< "${BATCH_SIZES_TEXT}"
@@ -32,12 +35,15 @@ elif [[ "${DATASET}" == "google-research-datasets/mbpp" ]]; then
     DATASET_ARGS+=(--dataset-format mbpp --hf-split test --hf-config sanitized)
 fi
 
-echo "LLaDA2 MoE saturation experiment"
+echo "LLaDA2 MoE denoising-route experiment"
 echo "  GPUs:              ${GPU_IDS}"
 echo "  loader:            HF Accelerate balanced device map"
 echo "  request batches:   ${BATCH_SIZES_TEXT}"
 echo "  max input tokens:  ${MAX_INPUT_LEN}"
 echo "  observed mask block: ${MASK_BLOCK_LENGTH}"
+echo "  denoising steps:   ${DENOISING_STEPS}"
+echo "  confidence:        ${CONFIDENCE_THRESHOLD}"
+echo "  temperature:       ${TEMPERATURE}"
 echo "  output:            ${OUTPUT_DIR}"
 
 CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_llada2_hf_moe_saturation.py \
@@ -49,6 +55,9 @@ CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_llada2_hf_moe_saturat
     --max-input-len "${MAX_INPUT_LEN}" \
     --max-scan-examples "${MAX_SCAN_EXAMPLES}" \
     --block-length "${MASK_BLOCK_LENGTH}" \
+    --denoising-steps "${DENOISING_STEPS}" \
+    --confidence-threshold "${CONFIDENCE_THRESHOLD}" \
+    --temperature "${TEMPERATURE}" \
     --max-memory-per-gpu "${MAX_MEMORY_PER_GPU}" \
     2>&1 | tee "${OUTPUT_DIR}/hf_trace_run.log"
 
@@ -62,9 +71,10 @@ while IFS= read -r trace_path; do
     [[ -n "${trace_path}" ]] && SUCCESSFUL_TRACES+=("${trace_path}")
 done < "${MANIFEST}"
 
-python benchmark/analyze_moe_saturation.py \
+python benchmark/analyze_moe_denoising.py \
     "${SUCCESSFUL_TRACES[@]}" \
-    --output-csv "${OUTPUT_DIR}/moe_saturation_summary.csv" \
-    --output-svg "${OUTPUT_DIR}/moe_saturation.svg"
+    --output-layer-csv "${OUTPUT_DIR}/moe_denoising_layers.csv" \
+    --output-summary-csv "${OUTPUT_DIR}/moe_denoising_summary.csv" \
+    --output-svg "${OUTPUT_DIR}/moe_denoising.svg"
 
 echo "Experiment complete: ${OUTPUT_DIR}"

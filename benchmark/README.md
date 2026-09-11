@@ -69,21 +69,21 @@ python profile_throughput.py \
 
 ## LLaDA2 MoE expert-saturation experiment
 
-Use the controlled first-denoising-step runner to test whether the union of
-active experts saturates at a small request batch. It uses one Python process
-and HuggingFace Accelerate's balanced device map, avoiding LMDeploy's
+Use the controlled full-denoising runner to test whether a small, concentrated
+expert working set remains stable throughout generation. It uses one Python
+process and HuggingFace Accelerate's balanced device map, avoiding LMDeploy's
 multi-process executor. Run task datasets separately so task-dependent routing
 remains visible:
 
 ```bash
-NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+CUDA_VISIBLE_DEVICES=0,1 NUM_PROMPTS=32 MAX_INPUT_LEN=128 BATCH_SIZES="8" \
   benchmark/run_llada2_moe_saturation.sh \
-  openai/gsm8k inclusionAI/LLaDA2.0-mini \
+  openai/gsm8k /root/lkd/Models/LLaDA2.0-mini \
   ./results/llada2_moe_saturation/gsm8k
 
-NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+CUDA_VISIBLE_DEVICES=0,1 NUM_PROMPTS=32 MAX_INPUT_LEN=128 BATCH_SIZES="8" \
   benchmark/run_llada2_moe_saturation.sh \
-  google-research-datasets/mbpp inclusionAI/LLaDA2.0-mini \
+  google-research-datasets/mbpp /root/lkd/Models/LLaDA2.0-mini \
   ./results/llada2_moe_saturation/mbpp
 ```
 
@@ -91,22 +91,33 @@ The GSM8K run uses the `main` test split. The MBPP run uses the hand-verified
 `sanitized` test split. Neither run executes a full benchmark or evaluates
 answer correctness.
 
-Defaults target two 40 GB GPUs, cap prompts at 128 tokens, and append one
-32-token all-mask block. For each batch, the profiler performs the initial
-denoising forward only and reads LLaDA2's official `output_router_logits`
-result. It counts routing for the mask block—not left-padding or prompt tokens.
-This isolates the maximum-query step while keeping batch size as the only swept
-variable. The output directory contains:
+Defaults target two 40 GB GPUs, cap prompts at 128 tokens, fix request batch at
+8, and run 32 denoising steps for one 32-token mask block. Before every model
+forward, the profiler marks the unresolved mask positions. It reads LLaDA2's
+official `output_router_logits` result and counts only the routes belonging to
+those positions—not prompt, padding, or already-decoded tokens. Candidate tokens
+are then accepted independently for every request using confidence > 0.95 or the
+step's minimum transfer quota. Thus each record describes the queries that
+actually entered that denoising step. The output directory contains:
 
-- `routes_bs*.jsonl`: expert-load histograms for the initial all-mask block;
-- `moe_saturation_summary.csv`: overall and per-layer saturation statistics;
-- `moe_saturation.svg`: measured active-expert ratio and the uniform-routing null;
+- `routes_bs*.jsonl`: per-step, per-layer expert-load histograms;
+- `moe_denoising_layers.csv`: raw layer/group/step metrics and hot-expert IDs;
+- `moe_denoising_summary.csv`: step-wise aggregates across layers and prompt groups;
+- `moe_denoising.svg`: query volume, working-set size, concentration, and stability curves;
 - `hf_trace_run.log`: model placement and progress output.
+
+The four primary statistics are active experts, inverse-Simpson effective
+experts, Top-10 load share, and the Jaccard overlap between the Top-10 sets of
+the same layer in adjacent steps. Expert IDs are never pooled across layers.
+`query_tokens` and `query_fraction` are retained as controls for the naturally
+shrinking diffusion workload. Step 0 is also the Vanilla all-mask observation;
+later work can run the same trace under FOCUS for a binary comparison.
 
 For a lower-memory smoke run:
 
 ```bash
-MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8" \
+MAX_INPUT_LEN=64 NUM_PROMPTS=16 BATCH_SIZES="8" \
+  MASK_BLOCK_LENGTH=16 DENOISING_STEPS=16 \
   benchmark/run_llada2_moe_saturation.sh \
   /path/to/dataset.json /path/to/LLaDA2.0-mini
 ```
@@ -114,8 +125,10 @@ MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8" \
 The profiler loads the model only once. An OOM at a larger batch does not
 discard completed smaller-batch traces. `MAX_MEMORY_PER_GPU` defaults to
 `38GiB`; override it if other processes reserve memory.
-Set `MASK_BLOCK_LENGTH` to change the observed all-mask block length. The older
-`MAX_NEW_TOKENS` environment name remains accepted as a compatibility alias.
+Set `MASK_BLOCK_LENGTH`, `DENOISING_STEPS`, `CONFIDENCE_THRESHOLD`, or
+`TEMPERATURE` to change the controlled generation process. Temperature 0 uses
+true greedy decoding. The older `MAX_NEW_TOKENS` environment name remains
+accepted as a compatibility alias for `MASK_BLOCK_LENGTH`.
 
 Dependencies for this runner are `torch`, `transformers`, `accelerate`, and
 `datasets`. OpenCompass is not used: it is only needed later when checking that

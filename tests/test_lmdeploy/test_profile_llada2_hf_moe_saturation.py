@@ -39,10 +39,29 @@ def test_build_batch_inputs_aligns_one_mask_block_and_masks_padding_keys():
 def test_router_layers_counts_only_observed_mask_block():
     # Shape: batch=1, sequence=3, top-k=2. Only the final two positions count.
     topk = torch.tensor([[[0, 1], [1, 2], [2, 2]]])
-    records = MODULE._router_layers([(torch.empty(0), topk)], 2, 4, 1)
+    active_mask = torch.tensor([[True, True]])
+    records = MODULE._router_layers([(torch.empty(0), topk)], active_mask, 4, 1)
     assert records == [{
         'layer_idx': 1,
         'active_experts': 2,
         'assignments': 4,
         'expert_load': [0, 1, 3, 0],
     }]
+
+
+def test_router_layers_excludes_resolved_positions():
+    topk = torch.tensor([[[0, 0], [1, 2], [3, 3]]])
+    active_mask = torch.tensor([[False, True]])
+    records = MODULE._router_layers([(torch.empty(0), topk)], active_mask, 4, 1)
+    assert records[0]['expert_load'] == [0, 0, 0, 2]
+
+
+def test_transfer_schedule_and_candidate_acceptance():
+    assert MODULE._transfer_schedule(5, 3) == [2, 2, 1]
+    block = torch.tensor([[99, 99, 7, 99]])
+    active = block.eq(99)
+    candidates = torch.tensor([[10, 11, 12, 13]])
+    confidence = torch.tensor([[0.2, 0.9, 1.0, 0.1]])
+    transferred = MODULE._accept_candidates(block, active, candidates, confidence, 2, 0.95)
+    assert transferred == [2]
+    assert block.tolist() == [[10, 11, 7, 99]]

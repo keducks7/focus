@@ -129,38 +129,41 @@ All scripts write logs to `./results`. Run them from the repo root.
   [`benchmark/run_llada2_moe_saturation.sh`](benchmark/run_llada2_moe_saturation.sh)
 
   ```bash
-  NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+  CUDA_VISIBLE_DEVICES=0,1 NUM_PROMPTS=32 MAX_INPUT_LEN=128 BATCH_SIZES="8" \
     benchmark/run_llada2_moe_saturation.sh \
-    openai/gsm8k inclusionAI/LLaDA2.0-mini \
+    openai/gsm8k /root/lkd/Models/LLaDA2.0-mini \
     ./results/llada2_moe_saturation/gsm8k
 
-  NUM_PROMPTS=64 MAX_INPUT_LEN=128 \
+  CUDA_VISIBLE_DEVICES=0,1 NUM_PROMPTS=32 MAX_INPUT_LEN=128 BATCH_SIZES="8" \
     benchmark/run_llada2_moe_saturation.sh \
-    google-research-datasets/mbpp inclusionAI/LLaDA2.0-mini \
+    google-research-datasets/mbpp /root/lkd/Models/LLaDA2.0-mini \
     ./results/llada2_moe_saturation/mbpp
   ```
 
   The default configuration is sized for two 40 GB GPUs. It loads the official
   Transformers model once using HuggingFace Accelerate's balanced device map,
-  caps prompts at 128 tokens, appends one 32-token all-mask block, and scans
-  request batches `1 2 4 8 16 32`. The official `output_router_logits` return
-  value provides per-layer top-k expert IDs; no LMDeploy multiprocessing or
-  model-side tracing hook is used. Override resource limits with environment
-  variables, for example:
+  caps prompts at 128 tokens, and performs all 32 denoising steps for one
+  32-token mask block at request batch 8. At every step, the official
+  `output_router_logits` result supplies per-layer top-k expert IDs. Only tokens
+  that are still masked at the start of that step are counted; prompt and
+  already-decoded tokens are excluded. No LMDeploy multiprocessing or model-side
+  tracing hook is used. Override resource limits with environment variables:
 
   ```bash
-  MAX_INPUT_LEN=64 NUM_PROMPTS=32 BATCH_SIZES="1 2 4 8 16" \
+  MAX_INPUT_LEN=64 NUM_PROMPTS=16 BATCH_SIZES="8" \
+    MASK_BLOCK_LENGTH=16 DENOISING_STEPS=16 \
     benchmark/run_llada2_moe_saturation.sh \
     /path/to/dataset.json /path/to/LLaDA2.0-mini
   ```
 
-  This is a routing observation, not a latency benchmark. Every observation is
-  the initial denoising forward of an all-mask block, and only those mask-token
-  routes are counted. Use the regular throughput scripts for clean latency
-  numbers. If a larger batch runs out of memory, completed smaller-batch traces
-  remain available.
+  This is a routing observation, not a latency benchmark. It reports the active
+  expert count, inverse-Simpson effective expert count, Top-10 load share, and
+  same-layer adjacent-step Top-10 Jaccard overlap. It also records the remaining
+  query count, so apparent concentration caused only by shrinking query volume
+  is visible. Step 0 is the Vanilla all-mask baseline. Use the regular throughput
+  scripts for clean latency numbers.
 
-  The examples intentionally sample only 64 prompts from the GSM8K `main` test
+  The examples intentionally sample only 32 prompts from the GSM8K `main` test
   split and the MBPP `sanitized` test split. They profile routing behavior only;
   they do not generate complete answers or score them. OpenCompass is reserved
   for the later quality-preservation evaluation, not this motivation experiment.
