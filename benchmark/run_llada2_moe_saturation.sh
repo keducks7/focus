@@ -33,6 +33,8 @@ elif [[ "${DATASET}" == "openai/gsm8k" ]]; then
     DATASET_ARGS+=(--dataset-format gsm8k --hf-split test --hf-config main)
 elif [[ "${DATASET}" == "google-research-datasets/mbpp" ]]; then
     DATASET_ARGS+=(--dataset-format mbpp --hf-split test --hf-config sanitized)
+elif [[ "${DATASET}" == "openai/openai_humaneval" ]]; then
+    DATASET_ARGS+=(--dataset-format auto --hf-split test)
 fi
 
 echo "LLaDA2 MoE denoising-route experiment"

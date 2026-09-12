@@ -17,6 +17,7 @@ from typing import Dict, Iterable, List, Optional
 
 GSM8K_DATASET_ID = 'openai/gsm8k'
 MBPP_DATASET_ID = 'google-research-datasets/mbpp'
+HUMANEVAL_DATASET_ID = 'openai/openai_humaneval'
 
 
 def _extract_prompt(row: Dict, dataset_format: str) -> Optional[str]:
@@ -283,6 +284,11 @@ def main():
     elif args.dataset == MBPP_DATASET_ID:
         args.dataset_format = 'mbpp'
         args.hf_config = args.hf_config or 'sanitized'
+        args.hf_split = args.hf_split or 'test'
+    elif args.dataset == HUMANEVAL_DATASET_ID:
+        # HumanEval exposes code-completion prompts in its test split. The
+        # generic prompt extractor reads the row's ``prompt`` field.
+        args.dataset_format = 'auto'
         args.hf_split = args.hf_split or 'test'
     else:
         args.hf_split = args.hf_split or 'train'
