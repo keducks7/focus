@@ -79,6 +79,7 @@ def fused_moe_kernel(
     SortedIdx,
     ExpStart,
     ExpEnd,
+    ExpertOrder,
     N: tl.constexpr,
     K: tl.constexpr,
     stride_am: tl.constexpr,
@@ -103,6 +104,8 @@ def fused_moe_kernel(
 ):
     """Fused moe kernel."""
     exp_id = tl.program_id(1)
+    if ExpertOrder is not None:
+        exp_id = tl.load(ExpertOrder + exp_id)
     pid = tl.program_id(0)
 
     exp_start = tl.load(ExpStart + exp_id + expert_offset)
@@ -182,8 +185,15 @@ def fused_moe_kernel_launcher(
     expert_offset: int = 0,
     reindex_a: bool = True,
     reindex_c: bool = True,
+    expert_order: torch.Tensor = None,
 ):
-    """Fused moe kernel launcher."""
+    """Fused moe kernel launcher.
+
+    expert_order, when supplied, must be a CUDA integer permutation of local
+    expert IDs [0, B.size(0)). It changes grid-to-expert mapping only. Callers
+    validate the permutation outside timing-critical code; None preserves the
+    original mapping. Grid order does not guarantee GPU execution order.
+    """
 
     if num_tokens is None:
         num_tokens = A.size(0)
@@ -209,6 +219,7 @@ def fused_moe_kernel_launcher(
         sorted_idx,
         exp_start,
         exp_end,
+        expert_order,
         N=N,
         K=K,
         stride_am=A.stride(0),
@@ -505,7 +516,8 @@ def fused_moe(hidden_states: torch.Tensor,
               expert_offset: int = 0,
               num_experts: int = None,
               renormalize: bool = False,
-              act_func: Callable = None) -> torch.Tensor:
+              act_func: Callable = None,
+              expert_order: torch.Tensor = None) -> torch.Tensor:
     """Fused moe."""
     M = hidden_states.size(0)
     E, N, _ = w1.shape
@@ -534,6 +546,7 @@ def fused_moe(hidden_states: torch.Tensor,
         expert_offset=expert_offset,
         reindex_a=True,
         reindex_c=False,
+        expert_order=expert_order,
     )
 
     # activate
@@ -564,6 +577,7 @@ def fused_moe(hidden_states: torch.Tensor,
         expert_offset=expert_offset,
         reindex_a=False,
         reindex_c=True,
+        expert_order=expert_order,
     )
 
     ret = moe_reduce(intermediate_cache2, topk_weights)

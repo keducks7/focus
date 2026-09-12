@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="720">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450" y="28" text-anchor="middle" font-family="sans-serif" font-size="18">Observed Routing vs Query-Matched Step-0 Null</text>
+<line x1="78" y1="220.0" x2="870" y2="220.0" stroke="#e5e5e5"/>
+<text x="70" y="224.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="78" y1="190.0" x2="870" y2="190.0" stroke="#e5e5e5"/>
+<text x="70" y="194.0" text-anchor="end" font-family="sans-serif" font-size="11">27.4</text>
+<line x1="78" y1="160.0" x2="870" y2="160.0" stroke="#e5e5e5"/>
+<text x="70" y="164.0" text-anchor="end" font-family="sans-serif" font-size="11">54.8</text>
+<line x1="78" y1="130.0" x2="870" y2="130.0" stroke="#e5e5e5"/>
+<text x="70" y="134.0" text-anchor="end" font-family="sans-serif" font-size="11">82.2</text>
+<line x1="78" y1="100.0" x2="870" y2="100.0" stroke="#e5e5e5"/>
+<text x="70" y="104.0" text-anchor="end" font-family="sans-serif" font-size="11">109.5</text>
+<line x1="78" y1="70.0" x2="870" y2="70.0" stroke="#e5e5e5"/>
+<text x="70" y="74.0" text-anchor="end" font-family="sans-serif" font-size="11">136.9</text>
+<text x="78" y="58" font-family="sans-serif" font-size="14">Active experts</text>
+<polyline points="78.0,97.0 112.4,92.6 146.9,83.4 181.3,81.1 215.7,83.4 250.2,81.4 284.6,83.1 319.0,83.9 353.5,85.4 387.9,89.1 422.3,93.0 456.8,98.4 491.2,101.5 525.7,112.7 560.1,121.8 594.5,132.7 629.0,144.0 663.4,154.6 697.8,169.6 732.3,186.5 766.7,192.6 801.1,184.8 835.6,200.2 870.0,211.2" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<polyline points="78.0,115.9 112.4,116.6 146.9,117.5 181.3,118.6 215.7,120.1 250.2,121.1 284.6,122.8 319.0,124.7 353.5,126.5 387.9,129.5 422.3,132.8 456.8,135.3 491.2,138.7 525.7,143.4 560.1,148.2 594.5,154.1 629.0,160.2 663.4,166.8 697.8,174.8 732.3,185.8 766.7,194.3 801.1,188.6 835.6,201.7 870.0,212.3" fill="none" stroke="#d1495b" stroke-width="2.5" stroke-dasharray="7 4"/>
+<line x1="78" y1="220" x2="870" y2="220" stroke="#222"/>
+<line x1="78" y1="435.0" x2="870" y2="435.0" stroke="#e5e5e5"/>
+<text x="70" y="439.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="78" y1="405.0" x2="870" y2="405.0" stroke="#e5e5e5"/>
+<text x="70" y="409.0" text-anchor="end" font-family="sans-serif" font-size="11">8.7</text>
+<line x1="78" y1="375.0" x2="870" y2="375.0" stroke="#e5e5e5"/>
+<text x="70" y="379.0" text-anchor="end" font-family="sans-serif" font-size="11">17.5</text>
+<line x1="78" y1="345.0" x2="870" y2="345.0" stroke="#e5e5e5"/>
+<text x="70" y="349.0" text-anchor="end" font-family="sans-serif" font-size="11">26.2</text>
+<line x1="78" y1="315.0" x2="870" y2="315.0" stroke="#e5e5e5"/>
+<text x="70" y="319.0" text-anchor="end" font-family="sans-serif" font-size="11">35.0</text>
+<line x1="78" y1="285.0" x2="870" y2="285.0" stroke="#e5e5e5"/>
+<text x="70" y="289.0" text-anchor="end" font-family="sans-serif" font-size="11">43.7</text>
+<text x="78" y="273" font-family="sans-serif" font-size="14">Effective experts</text>
+<polyline points="78.0,326.6 112.4,325.4 146.9,319.6 181.3,318.2 215.7,320.2 250.2,315.2 284.6,311.8 319.0,306.8 353.5,302.6 387.9,300.5 422.3,300.0 456.8,298.5 491.2,296.1 525.7,300.7 560.1,303.6 594.5,305.3 629.0,317.6 663.4,326.9 697.8,342.0 732.3,364.4 766.7,371.5 801.1,354.4 835.6,381.9 870.0,407.6" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<polyline points="78.0,339.3 112.4,339.4 146.9,339.4 181.3,339.5 215.7,339.6 250.2,339.7 284.6,339.8 319.0,339.9 353.5,340.2 387.9,340.4 422.3,340.9 456.8,341.1 491.2,341.9 525.7,342.8 560.1,343.8 594.5,345.7 629.0,348.1 663.4,351.3 697.8,356.5 732.3,367.5 766.7,380.3 801.1,368.8 835.6,389.0 870.0,412.5" fill="none" stroke="#d1495b" stroke-width="2.5" stroke-dasharray="7 4"/>
+<line x1="78" y1="435" x2="870" y2="435" stroke="#222"/>
+<line x1="78" y1="650.0" x2="870" y2="650.0" stroke="#e5e5e5"/>
+<text x="70" y="654.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="78" y1="620.0" x2="870" y2="620.0" stroke="#e5e5e5"/>
+<text x="70" y="624.0" text-anchor="end" font-family="sans-serif" font-size="11">0.2</text>
+<line x1="78" y1="590.0" x2="870" y2="590.0" stroke="#e5e5e5"/>
+<text x="70" y="594.0" text-anchor="end" font-family="sans-serif" font-size="11">0.4</text>
+<line x1="78" y1="560.0" x2="870" y2="560.0" stroke="#e5e5e5"/>
+<text x="70" y="564.0" text-anchor="end" font-family="sans-serif" font-size="11">0.6</text>
+<line x1="78" y1="530.0" x2="870" y2="530.0" stroke="#e5e5e5"/>
+<text x="70" y="534.0" text-anchor="end" font-family="sans-serif" font-size="11">0.8</text>
+<line x1="78" y1="500.0" x2="870" y2="500.0" stroke="#e5e5e5"/>
+<text x="70" y="504.0" text-anchor="end" font-family="sans-serif" font-size="11">1.0</text>
+<text x="78" y="488" font-family="sans-serif" font-size="14">Top-10 load share</text>
+<polyline points="78.0,575.3 112.4,575.9 146.9,578.8 181.3,579.4 215.7,578.9 250.2,581.0 284.6,582.7 319.0,584.7 353.5,586.4 387.9,587.2 422.3,588.0 456.8,588.8 491.2,589.8 525.7,588.5 560.1,587.9 594.5,587.9 629.0,584.2 663.4,579.7 697.8,573.0 732.3,560.6 766.7,555.5 801.1,569.2 835.6,550.7 870.0,500.0" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<polyline points="78.0,570.2 112.4,570.2 146.9,570.1 181.3,570.1 215.7,570.1 250.2,570.1 284.6,570.0 319.0,569.9 353.5,569.9 387.9,569.8 422.3,569.6 456.8,569.5 491.2,569.3 525.7,568.9 560.1,568.5 594.5,567.8 629.0,566.9 663.4,565.6 697.8,563.2 732.3,556.6 766.7,541.7 801.1,556.8 835.6,542.2 870.0,500.0" fill="none" stroke="#d1495b" stroke-width="2.5" stroke-dasharray="7 4"/>
+<line x1="78" y1="650" x2="870" y2="650" stroke="#222"/>
+<text x="78.0" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">1</text>
+<text x="181.3" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">4</text>
+<text x="284.6" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">7</text>
+<text x="387.9" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">10</text>
+<text x="491.2" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">13</text>
+<text x="594.5" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">16</text>
+<text x="697.8" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">19</text>
+<text x="801.1" y="672" text-anchor="middle" font-family="sans-serif" font-size="11">22</text>
+<line x1="630" y1="48" x2="654" y2="48" stroke="#1769aa" stroke-width="2.5"/>
+<text x="660" y="52" font-family="sans-serif" font-size="11">observed</text>
+<line x1="740" y1="48" x2="764" y2="48" stroke="#d1495b" stroke-width="2.5" stroke-dasharray="7 4"/>
+<text x="770" y="52" font-family="sans-serif" font-size="11">query-matched null</text>
+<text x="474.0" y="700" text-anchor="middle" font-family="sans-serif" font-size="13">Target denoising step</text>
+</svg>
