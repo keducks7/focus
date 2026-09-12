@@ -1,0 +1,99 @@
+/root/miniconda3/envs/focus/lib/python3.10/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Sampled 32 prompts; loading model once across two GPUs...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/7 [00:00<?, ?it/s]Loading checkpoint shards:  14%|█▍        | 1/7 [00:02<00:13,  2.25s/it]Loading checkpoint shards:  29%|██▊       | 2/7 [00:04<00:12,  2.52s/it]Loading checkpoint shards:  43%|████▎     | 3/7 [00:07<00:10,  2.65s/it]Loading checkpoint shards:  57%|█████▋    | 4/7 [00:10<00:08,  2.67s/it]Loading checkpoint shards:  71%|███████▏  | 5/7 [00:13<00:05,  2.69s/it]Loading checkpoint shards:  86%|████████▌ | 6/7 [00:15<00:02,  2.71s/it]Loading checkpoint shards: 100%|██████████| 7/7 [00:16<00:00,  2.10s/it]Loading checkpoint shards: 100%|██████████| 7/7 [00:16<00:00,  2.40s/it]
+Device map: {'model.word_embeddings': 0, 'model.layers.0': 0, 'model.layers.1': 0, 'model.layers.2': 0, 'model.layers.3': 0, 'model.layers.4': 0, 'model.layers.5': 0, 'model.layers.6': 0, 'model.layers.7': 0, 'model.layers.8': 0, 'model.layers.9': 1, 'model.layers.10': 1, 'model.layers.11': 1, 'model.layers.12': 1, 'model.layers.13': 1, 'model.layers.14': 1, 'model.layers.15': 1, 'model.layers.16': 1, 'model.layers.17': 1, 'model.layers.18': 1, 'model.layers.19': 1, 'model.norm': 1, 'model.rotary_emb': 1, 'lm_head': 1}
+Running batch 8 (4 full groups)...
+  batch=8 group=1/4 step=1/32 Q=256->242
+  batch=8 group=1/4 step=2/32 Q=242->228
+  batch=8 group=1/4 step=3/32 Q=228->217
+  batch=8 group=1/4 step=4/32 Q=217->195
+  batch=8 group=1/4 step=5/32 Q=195->165
+  batch=8 group=1/4 step=6/32 Q=165->151
+  batch=8 group=1/4 step=7/32 Q=151->129
+  batch=8 group=1/4 step=8/32 Q=129->118
+  batch=8 group=1/4 step=9/32 Q=118->99
+  batch=8 group=1/4 step=10/32 Q=99->88
+  batch=8 group=1/4 step=11/32 Q=88->66
+  batch=8 group=1/4 step=12/32 Q=66->55
+  batch=8 group=1/4 step=13/32 Q=55->43
+  batch=8 group=1/4 step=14/32 Q=43->36
+  batch=8 group=1/4 step=15/32 Q=36->26
+  batch=8 group=1/4 step=16/32 Q=26->22
+  batch=8 group=1/4 step=17/32 Q=22->19
+  batch=8 group=1/4 step=18/32 Q=19->16
+  batch=8 group=1/4 step=19/32 Q=16->13
+  batch=8 group=1/4 step=20/32 Q=13->11
+  batch=8 group=1/4 step=21/32 Q=11->9
+  batch=8 group=1/4 step=22/32 Q=9->2
+  batch=8 group=1/4 step=23/32 Q=2->0
+  batch=8 group=2/4 step=1/32 Q=256->241
+  batch=8 group=2/4 step=2/32 Q=241->227
+  batch=8 group=2/4 step=3/32 Q=227->215
+  batch=8 group=2/4 step=4/32 Q=215->186
+  batch=8 group=2/4 step=5/32 Q=186->169
+  batch=8 group=2/4 step=6/32 Q=169->155
+  batch=8 group=2/4 step=7/32 Q=155->143
+  batch=8 group=2/4 step=8/32 Q=143->133
+  batch=8 group=2/4 step=9/32 Q=133->116
+  batch=8 group=2/4 step=10/32 Q=116->92
+  batch=8 group=2/4 step=11/32 Q=92->81
+  batch=8 group=2/4 step=12/32 Q=81->59
+  batch=8 group=2/4 step=13/32 Q=59->49
+  batch=8 group=2/4 step=14/32 Q=49->37
+  batch=8 group=2/4 step=15/32 Q=37->29
+  batch=8 group=2/4 step=16/32 Q=29->21
+  batch=8 group=2/4 step=17/32 Q=21->15
+  batch=8 group=2/4 step=18/32 Q=15->10
+  batch=8 group=2/4 step=19/32 Q=10->7
+  batch=8 group=2/4 step=20/32 Q=7->5
+  batch=8 group=2/4 step=21/32 Q=5->3
+  batch=8 group=2/4 step=22/32 Q=3->1
+  batch=8 group=2/4 step=23/32 Q=1->0
+  batch=8 group=3/4 step=1/32 Q=256->245
+  batch=8 group=3/4 step=2/32 Q=245->229
+  batch=8 group=3/4 step=3/32 Q=229->214
+  batch=8 group=3/4 step=4/32 Q=214->202
+  batch=8 group=3/4 step=5/32 Q=202->185
+  batch=8 group=3/4 step=6/32 Q=185->173
+  batch=8 group=3/4 step=7/32 Q=173->161
+  batch=8 group=3/4 step=8/32 Q=161->134
+  batch=8 group=3/4 step=9/32 Q=134->114
+  batch=8 group=3/4 step=10/32 Q=114->94
+  batch=8 group=3/4 step=11/32 Q=94->82
+  batch=8 group=3/4 step=12/32 Q=82->67
+  batch=8 group=3/4 step=13/32 Q=67->60
+  batch=8 group=3/4 step=14/32 Q=60->48
+  batch=8 group=3/4 step=15/32 Q=48->38
+  batch=8 group=3/4 step=16/32 Q=38->29
+  batch=8 group=3/4 step=17/32 Q=29->20
+  batch=8 group=3/4 step=18/32 Q=20->12
+  batch=8 group=3/4 step=19/32 Q=12->4
+  batch=8 group=3/4 step=20/32 Q=4->2
+  batch=8 group=3/4 step=21/32 Q=2->1
+  batch=8 group=3/4 step=22/32 Q=1->0
+  batch=8 group=4/4 step=1/32 Q=256->234
+  batch=8 group=4/4 step=2/32 Q=234->219
+  batch=8 group=4/4 step=3/32 Q=219->200
+  batch=8 group=4/4 step=4/32 Q=200->179
+  batch=8 group=4/4 step=5/32 Q=179->170
+  batch=8 group=4/4 step=6/32 Q=170->153
+  batch=8 group=4/4 step=7/32 Q=153->141
+  batch=8 group=4/4 step=8/32 Q=141->122
+  batch=8 group=4/4 step=9/32 Q=122->103
+  batch=8 group=4/4 step=10/32 Q=103->87
+  batch=8 group=4/4 step=11/32 Q=87->72
+  batch=8 group=4/4 step=12/32 Q=72->58
+  batch=8 group=4/4 step=13/32 Q=58->49
+  batch=8 group=4/4 step=14/32 Q=49->33
+  batch=8 group=4/4 step=15/32 Q=33->28
+  batch=8 group=4/4 step=16/32 Q=28->14
+  batch=8 group=4/4 step=17/32 Q=14->10
+  batch=8 group=4/4 step=18/32 Q=10->7
+  batch=8 group=4/4 step=19/32 Q=7->3
+  batch=8 group=4/4 step=20/32 Q=3->2
+  batch=8 group=4/4 step=21/32 Q=2->1
+  batch=8 group=4/4 step=22/32 Q=1->0
+Successful traces:
+/root/lkd/FOCUS/results/llada2_moe_denoising/gsm8k_bs8/routes_bs8.jsonl
