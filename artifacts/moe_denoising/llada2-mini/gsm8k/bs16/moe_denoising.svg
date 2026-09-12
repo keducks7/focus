@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="860" viewBox="0 0 900 860">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450" y="28" text-anchor="middle" font-family="sans-serif" font-size="18">LLaDA2 MoE Routing Across Denoising Steps</text>
+<line x1="82" y1="260.0" x2="868" y2="260.0" stroke="#e5e5e5"/>
+<text x="73" y="264.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="82" y1="222.0" x2="868" y2="222.0" stroke="#e5e5e5"/>
+<text x="73" y="226.0" text-anchor="end" font-family="sans-serif" font-size="11">0.2</text>
+<line x1="82" y1="184.0" x2="868" y2="184.0" stroke="#e5e5e5"/>
+<text x="73" y="188.0" text-anchor="end" font-family="sans-serif" font-size="11">0.4</text>
+<line x1="82" y1="146.0" x2="868" y2="146.0" stroke="#e5e5e5"/>
+<text x="73" y="150.0" text-anchor="end" font-family="sans-serif" font-size="11">0.6</text>
+<line x1="82" y1="108.0" x2="868" y2="108.0" stroke="#e5e5e5"/>
+<text x="73" y="112.0" text-anchor="end" font-family="sans-serif" font-size="11">0.8</text>
+<line x1="82" y1="70.0" x2="868" y2="70.0" stroke="#e5e5e5"/>
+<text x="73" y="74.0" text-anchor="end" font-family="sans-serif" font-size="11">1.0</text>
+<text x="82" y="56" font-family="sans-serif" font-size="14">Remaining query fraction</text>
+<line x1="82" y1="70" x2="82" y2="260" stroke="#222"/>
+<line x1="82" y1="260" x2="868" y2="260" stroke="#222"/>
+<polyline points="82.0,70.0 114.8,81.7 147.5,92.5 180.2,102.7 213.0,115.8 245.8,132.0 278.5,140.9 311.2,154.6 344.0,167.6 376.8,179.1 409.5,193.8 442.2,206.4 475.0,214.0 507.7,222.9 540.5,231.6 573.2,238.3 606.0,244.0 638.8,248.3 671.5,251.7 704.2,254.4 737.0,256.7 769.8,257.8 802.5,257.4 835.2,258.9 868.0,259.6" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<line x1="82" y1="520.0" x2="868" y2="520.0" stroke="#e5e5e5"/>
+<text x="73" y="524.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="82" y1="482.0" x2="868" y2="482.0" stroke="#e5e5e5"/>
+<text x="73" y="486.0" text-anchor="end" font-family="sans-serif" font-size="11">0.2</text>
+<line x1="82" y1="444.0" x2="868" y2="444.0" stroke="#e5e5e5"/>
+<text x="73" y="448.0" text-anchor="end" font-family="sans-serif" font-size="11">0.4</text>
+<line x1="82" y1="406.0" x2="868" y2="406.0" stroke="#e5e5e5"/>
+<text x="73" y="410.0" text-anchor="end" font-family="sans-serif" font-size="11">0.6</text>
+<line x1="82" y1="368.0" x2="868" y2="368.0" stroke="#e5e5e5"/>
+<text x="73" y="372.0" text-anchor="end" font-family="sans-serif" font-size="11">0.8</text>
+<line x1="82" y1="330.0" x2="868" y2="330.0" stroke="#e5e5e5"/>
+<text x="73" y="334.0" text-anchor="end" font-family="sans-serif" font-size="11">1.0</text>
+<text x="82" y="316" font-family="sans-serif" font-size="14">Expert working-set ratio</text>
+<line x1="82" y1="330" x2="82" y2="520" stroke="#222"/>
+<line x1="82" y1="520" x2="868" y2="520" stroke="#222"/>
+<polyline points="82.0,448.9 114.8,436.7 147.5,433.7 180.2,427.5 213.0,425.9 245.8,427.5 278.5,426.1 311.2,427.2 344.0,427.8 376.8,428.8 409.5,431.3 442.2,434.0 475.0,437.6 507.7,439.7 540.5,447.3 573.2,453.5 606.0,460.8 638.8,468.5 671.5,475.7 704.2,485.8 737.0,497.3 769.8,501.4 802.5,496.1 835.2,506.6 868.0,514.1" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<polyline points="82.0,499.3 114.8,496.6 147.5,496.3 180.2,495.0 213.0,494.7 245.8,495.2 278.5,494.1 311.2,493.3 344.0,492.3 376.8,491.4 409.5,490.9 442.2,490.8 475.0,490.5 507.7,490.0 540.5,491.0 573.2,491.6 606.0,491.9 638.8,494.6 671.5,496.6 704.2,499.9 737.0,504.7 769.8,506.3 802.5,502.6 835.2,508.5 868.0,514.1" fill="none" stroke="#1769aa" stroke-width="2.5" stroke-dasharray="7 4"/>
+<line x1="82" y1="780.0" x2="868" y2="780.0" stroke="#e5e5e5"/>
+<text x="73" y="784.0" text-anchor="end" font-family="sans-serif" font-size="11">0.0</text>
+<line x1="82" y1="742.0" x2="868" y2="742.0" stroke="#e5e5e5"/>
+<text x="73" y="746.0" text-anchor="end" font-family="sans-serif" font-size="11">0.2</text>
+<line x1="82" y1="704.0" x2="868" y2="704.0" stroke="#e5e5e5"/>
+<text x="73" y="708.0" text-anchor="end" font-family="sans-serif" font-size="11">0.4</text>
+<line x1="82" y1="666.0" x2="868" y2="666.0" stroke="#e5e5e5"/>
+<text x="73" y="670.0" text-anchor="end" font-family="sans-serif" font-size="11">0.6</text>
+<line x1="82" y1="628.0" x2="868" y2="628.0" stroke="#e5e5e5"/>
+<text x="73" y="632.0" text-anchor="end" font-family="sans-serif" font-size="11">0.8</text>
+<line x1="82" y1="590.0" x2="868" y2="590.0" stroke="#e5e5e5"/>
+<text x="73" y="594.0" text-anchor="end" font-family="sans-serif" font-size="11">1.0</text>
+<text x="82" y="576" font-family="sans-serif" font-size="14">Hot-expert concentration / stability</text>
+<line x1="82" y1="590" x2="82" y2="780" stroke="#222"/>
+<line x1="82" y1="780" x2="868" y2="780" stroke="#222"/>
+<polyline points="82.0,678.9 114.8,685.3 147.5,686.1 180.2,689.9 213.0,690.6 245.8,690.0 278.5,692.7 311.2,694.8 344.0,697.2 376.8,699.4 409.5,700.4 442.2,701.4 475.0,702.5 507.7,703.8 540.5,702.1 573.2,701.3 606.0,701.3 638.8,696.7 671.5,691.0 704.2,682.5 737.0,666.8 769.8,660.2 802.5,677.7 835.2,654.2 868.0,590.0" fill="none" stroke="#1769aa" stroke-width="2.5"/>
+<polyline points="114.8,635.4 147.5,613.0 180.2,617.3 213.0,615.8 245.8,615.0 278.5,620.2 311.2,615.6 344.0,621.1 376.8,616.4 409.5,628.7 442.2,631.4 475.0,626.9 507.7,632.0 540.5,642.5 573.2,648.9 606.0,639.9 638.8,654.4 671.5,649.2 704.2,667.5 737.0,681.4 769.8,690.0 802.5,705.5 835.2,713.6 868.0,710.4" fill="none" stroke="#1769aa" stroke-width="2.5" stroke-dasharray="7 4"/>
+<text x="82.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">0</text>
+<text x="213.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">4</text>
+<text x="344.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">8</text>
+<text x="475.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">12</text>
+<text x="606.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">16</text>
+<text x="737.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">20</text>
+<text x="868.0" y="802" text-anchor="middle" font-family="sans-serif" font-size="11">24</text>
+<text x="475.0" y="835" text-anchor="middle" font-family="sans-serif" font-size="13">Denoising step</text>
+<line x1="590" y1="45" x2="614" y2="45" stroke="#1769aa" stroke-width="3"/>
+<text x="620" y="49" font-family="sans-serif" font-size="11">batch 16</text>
+<line x1="720" y1="45" x2="744" y2="45" stroke="#333" stroke-width="2.5"/>
+<text x="750" y="49" font-family="sans-serif" font-size="11">active / share</text>
+<line x1="720" y1="62" x2="744" y2="62" stroke="#333" stroke-width="2.5" stroke-dasharray="7 4"/>
+<text x="750" y="66" font-family="sans-serif" font-size="11">effective / overlap</text>
+</svg>
