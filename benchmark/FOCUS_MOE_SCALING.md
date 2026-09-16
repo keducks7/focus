@@ -1,5 +1,9 @@
 # Actual FOCUS versus Vanilla MoE scaling
 
+> Superseded: use [HF_FOCUS_SCALING.md](HF_FOCUS_SCALING.md) and
+> `profile_llada2_hf_focus_scaling.py`. The old command name now redirects to HF;
+> the LMDeploy commands/flags below document the historical runner only.
+
 Question: after actual FOCUS Query eviction, does the number of active routed
 experts still grow sublinearly with request batch size?
 

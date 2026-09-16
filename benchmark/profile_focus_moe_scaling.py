@@ -179,4 +179,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Preserve the old command name while switching execution to the HF backend.
+    from profile_llada2_hf_focus_scaling import main as hf_main
+    hf_main()
