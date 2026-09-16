@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "direction_changes": [
+    {
+      "nearer_distance": 1,
+      "nearer_direction": "stabilizing_with_depth",
+      "farther_distance": 2,
+      "farther_direction": "destabilizing_with_depth"
+    }
+  ]
+}

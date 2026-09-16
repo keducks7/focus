@@ -1,0 +1,163 @@
+Generating test split:   0%|          | 0/164 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 164/164 [00:00<00:00, 14482.00 examples/s]
+Sampled 32 prompts; loading LLaDA2 across two GPUs...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/7 [00:00<?, ?it/s]Loading checkpoint shards:  14%|█▍        | 1/7 [00:01<00:08,  1.43s/it]Loading checkpoint shards:  29%|██▊       | 2/7 [00:02<00:07,  1.48s/it]Loading checkpoint shards:  43%|████▎     | 3/7 [00:04<00:06,  1.62s/it]Loading checkpoint shards:  57%|█████▋    | 4/7 [00:06<00:04,  1.58s/it]Loading checkpoint shards:  71%|███████▏  | 5/7 [00:07<00:03,  1.56s/it]Loading checkpoint shards:  86%|████████▌ | 6/7 [00:09<00:01,  1.56s/it]Loading checkpoint shards: 100%|██████████| 7/7 [00:10<00:00,  1.28s/it]Loading checkpoint shards: 100%|██████████| 7/7 [00:10<00:00,  1.43s/it]
+group=1/4 step=0 Q=256->243
+group=1/4 step=1 Q=243->217
+group=1/4 step=2 Q=217->200
+group=1/4 step=3 Q=200->180
+group=1/4 step=4 Q=180->157
+group=1/4 step=5 Q=157->147
+group=1/4 step=6 Q=147->139
+group=1/4 step=7 Q=139->132
+group=1/4 step=8 Q=132->125
+group=1/4 step=9 Q=125->113
+group=1/4 step=10 Q=113->90
+group=1/4 step=11 Q=90->75
+group=1/4 step=12 Q=75->62
+group=1/4 step=13 Q=62->55
+group=1/4 step=14 Q=55->39
+group=1/4 step=15 Q=39->32
+group=1/4 step=16 Q=32->23
+group=1/4 step=17 Q=23->18
+group=1/4 step=18 Q=18->14
+group=1/4 step=19 Q=14->12
+group=1/4 step=20 Q=12->8
+group=1/4 step=21 Q=8->4
+group=1/4 step=22 Q=4->1
+group=1/4 step=23 Q=1->0
+group=2/4 step=0 Q=256->248
+group=2/4 step=1 Q=248->196
+group=2/4 step=2 Q=196->178
+group=2/4 step=3 Q=178->159
+group=2/4 step=4 Q=159->148
+group=2/4 step=5 Q=148->129
+group=2/4 step=6 Q=129->116
+group=2/4 step=7 Q=116->104
+group=2/4 step=8 Q=104->95
+group=2/4 step=9 Q=95->79
+group=2/4 step=10 Q=79->67
+group=2/4 step=11 Q=67->55
+group=2/4 step=12 Q=55->48
+group=2/4 step=13 Q=48->37
+group=2/4 step=14 Q=37->29
+group=2/4 step=15 Q=29->19
+group=2/4 step=16 Q=19->12
+group=2/4 step=17 Q=12->5
+group=2/4 step=18 Q=5->3
+group=2/4 step=19 Q=3->2
+group=2/4 step=20 Q=2->1
+group=2/4 step=21 Q=1->0
+group=3/4 step=0 Q=256->248
+group=3/4 step=1 Q=248->205
+group=3/4 step=2 Q=205->175
+group=3/4 step=3 Q=175->152
+group=3/4 step=4 Q=152->137
+group=3/4 step=5 Q=137->125
+group=3/4 step=6 Q=125->91
+group=3/4 step=7 Q=91->83
+group=3/4 step=8 Q=83->74
+group=3/4 step=9 Q=74->67
+group=3/4 step=10 Q=67->59
+group=3/4 step=11 Q=59->54
+group=3/4 step=12 Q=54->46
+group=3/4 step=13 Q=46->40
+group=3/4 step=14 Q=40->34
+group=3/4 step=15 Q=34->19
+group=3/4 step=16 Q=19->17
+group=3/4 step=17 Q=17->14
+group=3/4 step=18 Q=14->11
+group=3/4 step=19 Q=11->9
+group=3/4 step=20 Q=9->7
+group=3/4 step=21 Q=7->5
+group=3/4 step=22 Q=5->4
+group=3/4 step=23 Q=4->2
+group=3/4 step=24 Q=2->1
+group=3/4 step=25 Q=1->0
+group=4/4 step=0 Q=256->245
+group=4/4 step=1 Q=245->209
+group=4/4 step=2 Q=209->197
+group=4/4 step=3 Q=197->178
+group=4/4 step=4 Q=178->164
+group=4/4 step=5 Q=164->153
+group=4/4 step=6 Q=153->131
+group=4/4 step=7 Q=131->119
+group=4/4 step=8 Q=119->106
+group=4/4 step=9 Q=106->91
+group=4/4 step=10 Q=91->74
+group=4/4 step=11 Q=74->65
+group=4/4 step=12 Q=65->58
+group=4/4 step=13 Q=58->51
+group=4/4 step=14 Q=51->40
+group=4/4 step=15 Q=40->30
+group=4/4 step=16 Q=30->22
+group=4/4 step=17 Q=22->16
+group=4/4 step=18 Q=16->13
+group=4/4 step=19 Q=13->10
+group=4/4 step=20 Q=10->9
+group=4/4 step=21 Q=9->8
+group=4/4 step=22 Q=8->7
+group=4/4 step=23 Q=7->6
+group=4/4 step=24 Q=6->5
+group=4/4 step=25 Q=5->4
+group=4/4 step=26 Q=4->3
+group=4/4 step=27 Q=3->2
+group=4/4 step=28 Q=2->1
+group=4/4 step=29 Q=1->0
+similarity layer=10 step=0 experts=32/256
+similarity layer=10 step=0 experts=64/256
+similarity layer=10 step=0 experts=96/256
+similarity layer=10 step=0 experts=128/256
+similarity layer=10 step=0 experts=160/256
+similarity layer=10 step=0 experts=192/256
+similarity layer=10 step=0 experts=224/256
+similarity layer=10 step=0 experts=256/256
+similarity layer=10 step=1 experts=32/256
+similarity layer=10 step=1 experts=64/256
+similarity layer=10 step=1 experts=96/256
+similarity layer=10 step=1 experts=128/256
+similarity layer=10 step=1 experts=160/256
+similarity layer=10 step=1 experts=192/256
+similarity layer=10 step=1 experts=224/256
+similarity layer=10 step=1 experts=256/256
+similarity layer=10 step=2 experts=32/256
+similarity layer=10 step=2 experts=64/256
+similarity layer=10 step=2 experts=96/256
+similarity layer=10 step=2 experts=128/256
+similarity layer=10 step=2 experts=160/256
+similarity layer=10 step=2 experts=192/256
+similarity layer=10 step=2 experts=224/256
+similarity layer=10 step=2 experts=256/256
+similarity layer=10 step=3 experts=32/256
+similarity layer=10 step=3 experts=64/256
+similarity layer=10 step=3 experts=96/256
+similarity layer=10 step=3 experts=128/256
+similarity layer=10 step=3 experts=160/256
+similarity layer=10 step=3 experts=192/256
+similarity layer=10 step=3 experts=224/256
+similarity layer=10 step=3 experts=256/256
+similarity layer=10 step=4 experts=32/256
+similarity layer=10 step=4 experts=64/256
+similarity layer=10 step=4 experts=96/256
+similarity layer=10 step=4 experts=128/256
+similarity layer=10 step=4 experts=160/256
+similarity layer=10 step=4 experts=192/256
+similarity layer=10 step=4 experts=224/256
+similarity layer=10 step=4 experts=256/256
+similarity layer=10 step=8 experts=32/256
+similarity layer=10 step=8 experts=64/256
+similarity layer=10 step=8 experts=96/256
+similarity layer=10 step=8 experts=128/256
+similarity layer=10 step=8 experts=160/256
+similarity layer=10 step=8 experts=192/256
+similarity layer=10 step=8 experts=224/256
+similarity layer=10 step=8 experts=256/256
+similarity layer=10 step=12 experts=32/256
+similarity layer=10 step=12 experts=64/256
+similarity layer=10 step=12 experts=96/256
+similarity layer=10 step=12 experts=128/256
+similarity layer=10 step=12 experts=160/256
+similarity layer=10 step=12 experts=192/256
+similarity layer=10 step=12 experts=224/256
+similarity layer=10 step=12 experts=256/256
+Complete: /root/lkd/FOCUS/results/expert_trajectory/humaneval_bs8_layer10_v1
