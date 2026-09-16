@@ -1,0 +1,13 @@
+mode,batch,decode_layer_records,full_batch_layer_records
+vanilla,1,10393,10393
+vanilla,2,5985,4541
+vanilla,4,3230,2090
+vanilla,8,1634,836
+delayed,1,10469,10469
+delayed,2,5795,4579
+delayed,4,3192,1995
+delayed,8,1653,836
+focus,1,12768,12768
+focus,2,6783,5681
+focus,4,3686,2622
+focus,8,1919,1102
