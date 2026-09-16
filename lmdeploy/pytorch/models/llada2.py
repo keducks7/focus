@@ -19,6 +19,7 @@ from lmdeploy.pytorch.kernels.cuda.focus import (focus_compact_states, focus_com
                                                  focus_importance_ragged, focus_select_and_enforce_ragged)
 
 from .utils.cudagraph import CudaGraphMeta, CudaGraphMixin
+from .moe_observation import observe as observe_moe
 
 
 def _get_router_dtype(config: PretrainedConfig) -> torch.dtype:
@@ -528,6 +529,7 @@ class LLaDA2MoeSparseMoeBlock(nn.Module):
                  dtype: torch.dtype = None,
                  device: torch.device = None):
         super().__init__()
+        self.observation_layer_idx = layer_idx
         self.config = config
         quantization_config = getattr(config, 'quantization_config', None)
         self.hidden_dim = config.hidden_size
@@ -559,6 +561,9 @@ class LLaDA2MoeSparseMoeBlock(nn.Module):
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
         topk_weights, topk_ids = self.gate(hidden_states)
+
+        observe_moe(self.observation_layer_idx, topk_ids, self.num_experts,
+                    get_step_ctx_manager().current_context())
 
         out_states = self.experts(hidden_states, topk_weights, topk_ids)
 
