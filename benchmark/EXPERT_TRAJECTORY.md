@@ -1,5 +1,96 @@
 # LLaDA2 token trajectory and temporal expert-similarity experiment
 
+## Full-state lifecycle experiment (v2, recommended for new collection)
+
+This is an **observational research experiment**, not an acceleration method. Enable
+`FULL_LIFECYCLE=1 SKIP_SIMILARITY=1` to collect every generation position at every MoE layer,
+including already-decoded tokens. The old MASK-only mode remains the default for backward
+compatibility. No expert pruning, routing replacement, output reuse or extra terminal forward
+is introduced. It uses real request-batch parallelism and HF balanced **layer placement** across
+two GPUs, not LMDeploy, tensor parallelism, or sequential-request aggregation.
+
+Run from `/root/lkd/FOCUS` in the existing `focus-moe` environment:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 \
+FULL_LIFECYCLE=1 SKIP_SIMILARITY=1 \
+BATCH_SIZE=8 NUM_PROMPTS=8 MAX_INPUT_LEN=128 \
+BLOCK_LENGTH=32 GEN_LENGTH=32 DENOISING_STEPS=32 \
+bash benchmark/run_llada2_expert_trajectory.sh \
+  openai/gsm8k /root/lkd/Models/LLaDA2.0-mini \
+  results/expert_trajectory/gsm8k_bs8_lifecycle_smoke_v2
+```
+
+For the initial research run, change `NUM_PROMPTS=32` and use a new output directory, e.g.
+`results/expert_trajectory/gsm8k_bs8_lifecycle_v2`. Use identical prompts, lengths and seeds
+when later comparing B1/B4/B8. The prompt-token snapshot is saved for checking this.
+The supported generation region is still **one block**, with `GEN_LENGTH == BLOCK_LENGTH`;
+prompt positions are not traced. Longer multi-block generation is not implemented here.
+
+### What is recorded
+
+- All generation positions, every natural denoising forward, every MoE layer: selected expert
+  IDs, selected router logits and reconstructed model routing weights.
+- Pre-forward token ID and state (`mask`/`decoded`), acceptance event and acceptance time,
+  whether the request was already finished before this forward, and fresh-execution status.
+- Each layer's actual MLP output: online per-token cosine similarity and relative L2 change
+  against its own previous-step output, with the previous output norm as denominator.
+  These measure the **whole MLP output, including shared experts if present**, not each
+  individual routed expert. Zero-norm undefined normalized metrics are null.
+- Only the previous output tensor per layer is retained on CPU; full output tensors for all
+  steps are not stored. Group boundaries reset the observer. Hooks do not modify outputs.
+- Raw `query_tokens` counts all observed generation positions in v2;
+  `unresolved_tokens_before` counts MASK positions. The legacy `layer_histograms` field stays
+  MASK-only; use the new state-load analysis for decoded/all-state questions.
+
+At accepting step t the input is still MASK. The t→t+1 comparison includes the replacement
+of MASK by the accepted token. Later decoded comparisons are separate. A request that finished
+early may still be physically forwarded with its batch; these observations are flagged, and
+must not be mixed with active-request evidence. No extra steps are run to fabricate a
+post-acceptance window. Coverage records flag tokens with no post-acceptance observation while
+their request is still active; `accepted_by_end` distinguishes unaccepted tokens.
+
+### Analysis outputs
+
+The runner automatically writes `lifecycle_analysis/`:
+
+| File | Purpose |
+| --- | --- |
+| `lifecycle_events.csv` | Same-token, same-layer adjacent-step route Jaccard, normalized routing-weight TV and MLP-output change; includes request and group IDs |
+| `lifecycle_by_phase.csv` | Each layer: unresolved MASK, accepting MASK, first decoded forward, later decoded forwards |
+| `lifecycle_by_relative_acceptance_step.csv` | Layer × time relative to eventual acceptance (negative=before, zero=accepting, positive=after) |
+| `lifecycle_state_loads.csv` | Per group/step/layer/state active experts, effective experts and top-10 assignment share |
+| `lifecycle_cross_layer.csv` | Adjacent-layer correlation of token-pair expert-sharing patterns, not expert-ID overlap across layers |
+| `lifecycle_coverage.csv` | Acceptance and available decoded observations, including right-censored tokens |
+
+Phase/time summaries are token-event-weighted, separately stratified by
+`request_finished_before`. Use the False rows for natural active-request conclusions. Sample
+sizes change with relative time; inspect counts before interpreting a trend. Individual events
+within a request are not independent replicates. Use request/group IDs for later uncertainty
+estimation. Step zero has no predecessor, hence no adjacent-step event; it still appears in
+raw routes and state-load statistics.
+
+Cross-layer analysis uses up to 512 uniformly sampled, fixed identity pairs per group (seed 0),
+the same pairs for every layer and step. It compares within-layer `|TopK_i ∩ TopK_j| / K`
+across adjacent layers and separates same/cross-request and mask/decoded pair types. Completed
+requests are excluded. Empty strata produce no rows; constant or one-pair correlations are
+null, not zero. This sampling cap is an offline analysis budget, not a method parameter.
+
+Re-run CPU-only analysis without loading a model:
+
+```bash
+python benchmark/analyze_moe_lifecycle.py \
+  results/expert_trajectory/gsm8k_bs8_lifecycle_v2/token_trajectories_bs8.jsonl \
+  --output-dir results/expert_trajectory/gsm8k_bs8_lifecycle_v2/lifecycle_analysis
+```
+
+Old MASK-only traces cannot recover missing decoded routes and require recollection. The old
+acceptance analyzer can read v2 traces but explicitly filters decoded records, preserving its
+original interpretation. No timing/throughput claim should be based on this heavily instrumented
+profiler. Local CPU tests do not replace a server GPU smoke run.
+
+## Original MASK-only experiment
+
 This experiment asks two questions before designing a method:
 
 1. Does the expert route of one unresolved token become stable as that token approaches acceptance?

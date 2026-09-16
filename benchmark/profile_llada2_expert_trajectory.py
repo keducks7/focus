@@ -11,6 +11,7 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
+from moe_lifecycle import OutputDeltaCollector, annotate_lifecycle
 
 from profile_llada2_hf_moe_saturation import (
     GSM8K_DATASET_ID,
@@ -293,6 +294,10 @@ def parse_args():
     parser.add_argument('--hf-config', default=None)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--max-memory-per-gpu', default='38GiB')
+    parser.add_argument('--full-lifecycle', action='store_true',
+                        help='Observe all generation positions, including decoded tokens, at every MoE layer.')
+    parser.add_argument('--skip-similarity', action='store_true',
+                        help='Skip the separate all-expert similarity replay and hidden-state storage.')
     return parser.parse_args()
 
 
@@ -368,12 +373,19 @@ def main():
     if not hasattr(target_moe, 'experts'):
         raise RuntimeError(f'Layer {args.similarity_layer} is not an MoE layer with an expert bank.')
     collector = HiddenStateCollector(args.block_length, args.similarity_steps)
-    hook_handle = target_moe.register_forward_pre_hook(collector.hook)
+    hook_handles = []
+    if not args.skip_similarity:
+        hook_handles.append(target_moe.register_forward_pre_hook(collector.hook))
+    output_collector = OutputDeltaCollector(args.block_length)
+    if args.full_lifecycle:
+        for layer_idx in range(first_moe_layer, int(config.num_hidden_layers)):
+            hook_handles.append(core_model.layers[layer_idx].mlp.register_forward_hook(
+                output_collector.hook(layer_idx)))
     schedule = _transfer_schedule(args.block_length, args.denoising_steps)
 
     metadata = {
         'record_type': 'metadata',
-        'format_version': 1,
+        'format_version': 2 if args.full_lifecycle else 1,
         'model_type': 'llada2_moe_token_trajectory',
         'model_path': args.model_path,
         'dataset': args.dataset,
@@ -396,7 +408,14 @@ def main():
         'similarity_steps': args.similarity_steps,
         'confidence_threshold': args.confidence_threshold,
         'temperature': args.temperature,
-        'observed_region': 'unresolved_mask_queries',
+        'observed_region': 'all_generation_positions' if args.full_lifecycle else 'unresolved_mask_queries',
+        'backend': 'huggingface',
+        'mode': 'vanilla',
+        'use_cache': False,
+        'output_delta_scope': 'full_mlp_output_including_shared_experts_if_present',
+        'layer_histograms_scope': 'unresolved_mask_queries',
+        'skip_similarity': args.skip_similarity,
+        'denoising_steps': len(schedule),
         'prompt_snapshot': prompt_snapshot_path.name,
         'similarity_cohort': 'same tokens unresolved at every available selected step',
     }
@@ -405,6 +424,9 @@ def main():
         with trajectory_path.open('w', encoding='utf-8', buffering=1) as stream:
             stream.write(json.dumps(metadata, separators=(',', ':')) + '\n')
             for group_id in range(full_groups):
+                output_collector.reset()
+                acceptance_steps = {}
+                observation_counts = {}
                 start = group_id * args.batch_size
                 group = prompt_ids[start:start + args.batch_size]
                 input_ids, attention_mask, position_ids = _build_batch_inputs(
@@ -415,6 +437,8 @@ def main():
                     coordinates = active_mask.nonzero(as_tuple=False).to('cpu').tolist()
                     if not coordinates:
                         break
+                    before = current_block.clone()
+                    output_collector.begin_step()
                     token_ids = [(start + int(batch), 0, int(position)) for batch, position in coordinates]
                     collector.prepare(step, active_mask, token_ids)
                     with torch.inference_mode():
@@ -430,7 +454,7 @@ def main():
                             outputs.router_logits, active_mask, int(config.num_experts), first_moe_layer)
                         route_records = token_route_records(
                             outputs.router_logits,
-                            active_mask,
+                            torch.ones_like(active_mask) if args.full_lifecycle else active_mask,
                             first_moe_layer,
                             float(getattr(config, 'routed_scaling_factor', 1.0)),
                         )
@@ -442,6 +466,16 @@ def main():
                         selected = choose_candidate_mask(
                             active_mask, confidence_local, minimum_transfer, args.confidence_threshold)
                         accepted_mask = selected & candidate_local.ne(mask_id)
+                        if args.full_lifecycle:
+                            output_collector.attach(route_records)
+                            annotate_lifecycle(route_records, before, active_mask, accepted_mask,
+                                               acceptance_steps, step)
+                            for token in route_records:
+                                key = (token['batch_index'], token['block_position'])
+                                counts = observation_counts.setdefault(key, [0, 0])
+                                if not token['masked_before']:
+                                    counts[0] += 1
+                                    counts[1] += int(not token['request_finished_before'])
                         current_block[selected] = candidate_local[selected]
 
                     confidence_cpu = confidence_local.to('cpu')
@@ -467,6 +501,7 @@ def main():
                         'block_id': 0,
                         'step': step,
                         'query_tokens': len(route_records),
+                        'unresolved_tokens_before': int(active_mask.sum()),
                         'minimum_transfer': minimum_transfer,
                         'remaining_after_per_sequence': remaining,
                         'tokens': route_records,
@@ -477,6 +512,18 @@ def main():
                     del outputs, block_hidden, logits, candidates, confidence
                     del confidence_local, candidate_local, selected, accepted_mask
                     del route_records, layer_histograms
+                if args.full_lifecycle:
+                    stream.write(json.dumps({
+                        'record_type': 'lifecycle_coverage', 'group_id': group_id, 'block_id': 0,
+                        'tokens': [{
+                            'request_id': start + b, 'block_position': p,
+                            'acceptance_step': acceptance_steps.get((b, p)),
+                            'accepted_by_end': (b, p) in acceptance_steps,
+                            'decoded_observations': observation_counts.get((b, p), [0, 0])[0],
+                            'decoded_observations_while_request_active': observation_counts.get((b, p), [0, 0])[1],
+                            'post_acceptance_censored': observation_counts.get((b, p), [0, 0])[1] == 0,
+                        } for b in range(args.batch_size) for p in range(args.block_length)]
+                    }, separators=(',', ':')) + '\n')
                 stream.write(json.dumps({
                     'record_type': 'generation_result',
                     'group_id': group_id,
@@ -487,19 +534,21 @@ def main():
                 }, separators=(',', ':')) + '\n')
                 del current_block, input_ids, attention_mask, position_ids
     finally:
-        hook_handle.remove()
+        for handle in hook_handles:
+            handle.remove()
 
-    collector.save_raw(args.output_dir, args.batch_size, args.similarity_layer)
-    compute_similarity_outputs(
-        collector,
-        target_moe.experts,
-        args.similarity_steps,
-        args.similarity_samples,
-        args.seed,
-        args.output_dir,
-        args.batch_size,
-        args.similarity_layer,
-    )
+    if not args.skip_similarity:
+        collector.save_raw(args.output_dir, args.batch_size, args.similarity_layer)
+        compute_similarity_outputs(
+            collector,
+            target_moe.experts,
+            args.similarity_steps,
+            args.similarity_samples,
+            args.seed,
+            args.output_dir,
+            args.batch_size,
+            args.similarity_layer,
+        )
     print(f'Complete: {args.output_dir}', flush=True)
 
 

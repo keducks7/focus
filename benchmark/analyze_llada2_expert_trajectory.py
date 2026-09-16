@@ -60,6 +60,9 @@ def load_events(paths):
                 raise ValueError(f'{path}: query_tokens does not match the token record count')
             identities_this_step = set()
             for token in tokens:
+                # Keep the original acceptance analysis strictly MASK-only.
+                if not token.get('masked_before', True):
+                    continue
                 identity = (str(path), group_id, int(token['request_id']), int(token['block_id']),
                             int(token['block_position']))
                 if identity in identities_this_step:

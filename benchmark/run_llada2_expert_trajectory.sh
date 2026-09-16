@@ -23,6 +23,11 @@ SIMILARITY_LAYER=${SIMILARITY_LAYER:-10}
 SIMILARITY_STEPS_TEXT=${SIMILARITY_STEPS:-"0 1 2 3 4 8 12"}
 SIMILARITY_SAMPLES=${SIMILARITY_SAMPLES:-64}
 MAX_MEMORY_PER_GPU=${MAX_MEMORY_PER_GPU:-38GiB}
+FULL_LIFECYCLE=${FULL_LIFECYCLE:-0}
+SKIP_SIMILARITY=${SKIP_SIMILARITY:-0}
+EXTRA_ARGS=()
+if [[ "${FULL_LIFECYCLE}" == "1" ]]; then EXTRA_ARGS+=(--full-lifecycle); fi
+if [[ "${SKIP_SIMILARITY}" == "1" ]]; then EXTRA_ARGS+=(--skip-similarity); fi
 
 read -r -a SIMILARITY_STEP_ARRAY <<< "${SIMILARITY_STEPS_TEXT}"
 mkdir -p "${OUTPUT_DIR}"
@@ -38,6 +43,8 @@ echo "  similarity layer:  ${SIMILARITY_LAYER}"
 echo "  similarity steps:  ${SIMILARITY_STEPS_TEXT}"
 echo "  matched samples:   ${SIMILARITY_SAMPLES}"
 echo "  output:            ${OUTPUT_DIR}"
+echo "  full lifecycle:    ${FULL_LIFECYCLE}"
+echo "  skip similarity:   ${SKIP_SIMILARITY}"
 
 CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_llada2_expert_trajectory.py \
     "${DATASET}" "${MODEL}" \
@@ -54,10 +61,17 @@ CUDA_VISIBLE_DEVICES="${GPU_IDS}" python benchmark/profile_llada2_expert_traject
     --similarity-steps "${SIMILARITY_STEP_ARRAY[@]}" \
     --similarity-samples "${SIMILARITY_SAMPLES}" \
     --max-memory-per-gpu "${MAX_MEMORY_PER_GPU}" \
+    "${EXTRA_ARGS[@]}" \
     2>&1 | tee "${OUTPUT_DIR}/trajectory_run.log"
 
-python benchmark/analyze_llada2_expert_trajectory.py \
-    "${OUTPUT_DIR}/token_trajectories_bs${BATCH_SIZE}.jsonl" \
-    --output-dir "${OUTPUT_DIR}"
+if [[ "${FULL_LIFECYCLE}" == "1" ]]; then
+    python benchmark/analyze_moe_lifecycle.py \
+        "${OUTPUT_DIR}/token_trajectories_bs${BATCH_SIZE}.jsonl" \
+        --output-dir "${OUTPUT_DIR}/lifecycle_analysis"
+else
+    python benchmark/analyze_llada2_expert_trajectory.py \
+        "${OUTPUT_DIR}/token_trajectories_bs${BATCH_SIZE}.jsonl" \
+        --output-dir "${OUTPUT_DIR}"
+fi
 
 echo "Experiment complete: ${OUTPUT_DIR}"
