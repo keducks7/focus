@@ -28,6 +28,34 @@ select_cpu = load('route_cpu', ROOT/'benchmark/shared_route_selection.py')
 summarizer = load('summary_test', ROOT/'benchmark/summarize_shared_eval.py')
 
 
+@pytest.mark.parametrize('dtype', [torch.float32, torch.bfloat16])
+def test_eager_mask_conversion_preserves_visibility(dtype):
+    # Mixed prompt lengths exercise left padding and block-causal prefill.
+    _, _, additive, _, _ = decode.prepare_prefix(
+        [[1,2,3,4], [1,2]], 2, 0, 'cpu', dtype)
+    binary = decode.repository_eager_mask(additive, 'eager')
+    assert ((binary == 0) | (binary == 1)).all()
+    # Transformers 4.57.1 _prepare_4d_causal_attention_mask's 4D branch.
+    inverted = 1.0 - binary
+    prepared = inverted.masked_fill(inverted.bool(), torch.finfo(dtype).min)
+    assert torch.equal(prepared == 0, additive == 0)
+    assert (prepared[additive != 0] == torch.finfo(dtype).min).all()
+    assert (prepared == 0).any(-1).all()
+    # Feeding the old additive representation masks every entry.
+    old_inverted = 1.0 - additive
+    old_prepared = old_inverted.masked_fill(old_inverted.bool(), torch.finfo(dtype).min)
+    assert not (old_prepared == 0).any()
+    # Denoising/commit: all real prefix + current-block keys are visible.
+    current = torch.zeros((2,1,2,6), dtype=dtype)
+    current[1,:,:, :2] = float('-inf')
+    assert torch.equal(decode.repository_eager_mask(current, 'eager').bool(), current == 0)
+
+
+def test_eager_mask_rejects_other_backends():
+    with pytest.raises(ValueError, match='eager'):
+        decode.repository_eager_mask(torch.zeros(1,1,2,2), 'sdpa')
+
+
 @pytest.mark.parametrize('method',['joint','independent','joint_no_fixed'])
 def test_selector_matches_cpu(method):
     g = torch.Generator().manual_seed(13)
@@ -142,6 +170,7 @@ class FakeCache:
 class FakeCore(torch.nn.Module):
     def __init__(self):
         super().__init__()
+        self.config = SimpleNamespace(_attn_implementation='eager')
         self.word_embeddings = torch.nn.Embedding(12,12)
 
     def forward(self,input_ids,attention_mask,position_ids,past_key_values,store_kv,**kwargs):

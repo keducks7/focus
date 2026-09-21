@@ -11,6 +11,18 @@ import time
 import torch
 
 
+def repository_eager_mask(additive_mask, implementation):
+    """Adapt decoder masks to the vendored eager model's binary-mask API.
+
+    Its _prepare_4d_causal_attention_mask converts 1/0 into 0/dtype.min.
+    Passing our additive 0/-inf mask directly would mask every position.
+    SDPA uses a different contract and must not silently take this path.
+    """
+    if implementation != 'eager':
+        raise ValueError('Shared batch decode requires repository eager attention.')
+    return additive_mask.eq(0).to(dtype=additive_mask.dtype)
+
+
 def prepare_prefix(prompts, block_length, pad_id, device, dtype):
     if not prompts or any(not row for row in prompts):
         raise ValueError('Nonempty prompts required.')
@@ -66,6 +78,9 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
     if any(mask_id in p for p in prompts):
         raise ValueError('Prompt contains MASK token; ambiguous generation-state classification.')
     core = model.model
+    implementation = getattr(getattr(core, 'config', None), '_attn_implementation', None)
+    if implementation != 'eager':
+        raise ValueError('Shared batch decode requires repository eager attention.')
     device = core.word_embeddings.weight.device
     dtype = core.word_embeddings.weight.dtype
     ids, positions, attention, prefix_lengths, padding = prepare_prefix(
@@ -90,7 +105,8 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
         synchronize_model(model)
         start = time.perf_counter()
         try:
-            out = core(input_ids=x, attention_mask=attn, position_ids=pos,
+            model_mask = repository_eager_mask(attn, implementation)
+            out = core(input_ids=x, attention_mask=model_mask, position_ids=pos,
                        past_key_values=cache, use_cache=True, store_kv=store,
                        output_router_logits=False, return_dict=True)
             # Native LLaDA2ModelLM.forward exposes float32 logits to its sampler.
