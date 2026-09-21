@@ -7,8 +7,9 @@ import uuid
 from pathlib import Path
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 from transformers.cache_utils import DynamicCache
+from transformers.dynamic_module_utils import get_class_from_dynamic_module
 
 from .base import BaseModel
 from .llada2 import LLaDA2, _convert_chat_messages
@@ -52,8 +53,16 @@ class LLaDA2SharedBatch(LLaDA2):
                 raise RuntimeError('This config requires exactly two visible GPUs; use num_gpus=2, one worker.')
             torch.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                path, trust_remote_code=True, torch_dtype=torch.bfloat16,
+            # The checkpoint's remote code may lack the repository's block-cache
+            # API. Load code locally, while keeping checkpoint config/weights.
+            code_dir = Path(__file__).resolve().parent / 'LLaDA2.0-mini'
+            model_cls = get_class_from_dynamic_module(
+                'modeling_llada2_moe.LLaDA2MoeModelLM', str(code_dir),
+                local_files_only=True)
+            model_config = model_cls.config_class.from_pretrained(
+                path, local_files_only=True)
+            self.model = model_cls.from_pretrained(
+                path, config=model_config, torch_dtype=torch.bfloat16,
                 device_map='balanced', max_memory={0:max_memory_per_gpu,1:max_memory_per_gpu},
                 low_cpu_mem_usage=True, attn_implementation='eager').eval()
             if 'store_kv' not in inspect.signature(self.model.model.forward).parameters:

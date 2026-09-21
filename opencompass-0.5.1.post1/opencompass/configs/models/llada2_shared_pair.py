@@ -1,6 +1,6 @@
+_base_ = []  # Use eager parsing for environment-derived configuration.
 """Matched HF Vanilla / shared-route pair. Both use two GPUs, one worker."""
 import os
-from opencompass.models.llada2_shared_batch import LLaDA2SharedBatch
 
 _mode = os.environ.get('SHARED_MODE', 'both')
 if _mode not in ('both','vanilla','shared'):
@@ -15,7 +15,7 @@ for _name, _eps in [('vanilla',0.),('shared',_epsilon)]:
         continue
     _abbr = f'llada2-{_name}-{_method}-e{_eps:g}-b{_batch}'
     models.append(dict(
-        type=LLaDA2SharedBatch, abbr=_abbr,
+        type='opencompass.models.llada2_shared_batch.LLaDA2SharedBatch', abbr=_abbr,
         path=os.environ.get('MODEL_PATH','/root/lkd/Models/LLaDA2.0-mini'),
         max_seq_len=int(os.environ.get('MAX_SEQ_LEN','4096')),
         max_out_len=int(os.environ.get('MAX_OUT_LEN','1024')),
