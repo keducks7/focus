@@ -31,6 +31,27 @@ def summarize(root, exclude_first=False):
                             assignments_original=original, assignments_executed=total('assignments_executed'),
                             assignment_reduction=1-total('assignments_executed')/original if original else None,
                             reached_length_limit=sum(not e for r in rows for e in r['eos_finished']))
+        for field in ('peak_allocated_gib_by_gpu', 'peak_reserved_gib_by_gpu'):
+            devices = {d for r in rows for d in r.get(field, {})}
+            if devices:
+                results[name][field] = {d: max(r.get(field, {}).get(d, 0) for r in rows)
+                                       for d in sorted(devices)}
+        if all('block_layer_calls' in r for r in rows):
+            calls = total('block_layer_calls')
+            for metric in ('planning_seconds', 'routed_expert_seconds',
+                           'block_assignments_original', 'block_assignments_executed',
+                           'target_assignments_original', 'target_assignments_executed'):
+                results[name][metric] = total(metric)
+            for metric in ('mean_block_active_before', 'mean_block_active_after',
+                           'mean_target_active_before', 'mean_target_active_after'):
+                results[name][metric] = (sum(r[metric]*r['block_layer_calls'] for r in rows
+                    if r[metric] is not None)/calls if calls else None)
+            results[name]['block_layer_calls'] = calls
+            results[name]['component_timing_synchronized'] = all(
+                r['component_timing_synchronized'] for r in rows)
+            results[name]['component_timing_note'] = rows[0]['component_timing_note']
+            results[name]['moe_layer_seconds'] = (total('moe_layer_seconds') if all(
+                r.get('moe_layer_seconds') is not None for r in rows) else None)
     return dict(exclude_first_call=exclude_first, models=results,
                 scope='generate() wall excludes model load, dataset I/O and evaluation; tokens include EOS; static batches',
                 accuracy='Use OpenCompass summary. This file does not compute task accuracy.')
@@ -42,6 +63,8 @@ if __name__ == '__main__':
     p.add_argument('--output', type=Path)
     p.add_argument('--exclude-first-call', action='store_true')
     p.add_argument('--expected-models', type=int)
+    p.add_argument('--expected-requests', type=int,
+                   help='Fail if any variant has fewer/more requests than the expected dataset size.')
     a = p.parse_args()
     result = summarize(a.root, a.exclude_first_call)
     if not result['models']:
@@ -51,6 +74,9 @@ if __name__ == '__main__':
             raise SystemExit('Missing model measurements; inspect OpenCompass failure logs.')
         if len({v['requests'] for v in result['models'].values()}) != 1:
             raise SystemExit('Models processed different request counts; not a matched comparison.')
+    if a.expected_requests is not None and any(
+            v['requests'] != a.expected_requests for v in result['models'].values()):
+        raise SystemExit('Unexpected dataset request count; do not compare incomplete runs.')
     content = json.dumps(result, indent=2)
     print(content)
     if a.output:

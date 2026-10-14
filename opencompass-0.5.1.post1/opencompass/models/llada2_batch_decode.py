@@ -98,10 +98,16 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
     stats['request_denoising_steps'] = [0]*batch
     controller.reset_stats()
     synchronize_model(model)
+    measured_devices = {p.device for p in model.parameters() if p.device.type == 'cuda'}
+    for gpu in measured_devices:
+        torch.cuda.reset_peak_memory_stats(gpu)
     started = time.perf_counter()
 
-    def forward(x, attn, pos, store, phase, compress=None):
+    def forward(x, attn, pos, store, phase, compress=None, valid=None):
         controller.compress = compress
+        if hasattr(controller, 'begin_block_forward') and phase == 'denoise':
+            requests = torch.arange(batch, device=device)[:, None].expand_as(x)
+            controller.begin_block_forward(requests, valid)
         synchronize_model(model)
         start = time.perf_counter()
         try:
@@ -114,6 +120,8 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
             synchronize_model(model)
         finally:
             controller.compress = None
+            if hasattr(controller, 'end_block_forward'):
+                controller.end_block_forward()
         stats[f'{phase}_seconds'] += time.perf_counter()-start
         stats[f'{phase}_forwards'] += 1
         return logits
@@ -140,7 +148,13 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
             active = current.eq(mask_id) & alive
             if not active.any():
                 break
-            logits = forward(current, attn, pos, False, 'denoise', active)
+            # New joint controller sees BOTH MASK and decoded generation
+            # positions. Legacy MASK-only controller still receives `active`.
+            valid = alive.expand_as(current).clone()
+            if block_idx == 0:
+                for i, r in enumerate(remainders):
+                    valid[i, :r] = False  # partial prompt, not generation
+            logits = forward(current, attn, pos, False, 'denoise', active, valid)
             if sampling == 'native':
                 candidates, confidence = model._sample_with_temperature_topk_topp(
                     logits, temperature=temperature, top_k=top_k, top_p=top_p)
@@ -194,4 +208,10 @@ def generate_batch(model, prompts, *, mask_id, pad_id, eos_id, gen_length,
                  compressed_layer_calls=controller.compressed_layer_calls,
                  batch_size=batch, generated_tokens=sum(len(v) for v in outputs),
                  output_token_lengths=[len(v) for v in outputs])
+    stats['peak_allocated_gib_by_gpu'] = {
+        str(gpu): torch.cuda.max_memory_allocated(gpu)/(1024**3) for gpu in measured_devices}
+    stats['peak_reserved_gib_by_gpu'] = {
+        str(gpu): torch.cuda.max_memory_reserved(gpu)/(1024**3) for gpu in measured_devices}
+    if hasattr(controller, 'extra_stats'):
+        stats.update(controller.extra_stats())
     return outputs, stats
